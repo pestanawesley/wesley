@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simule seu Consórcio | Atendimento Especialista</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Inter', sans-serif;}
+body{background:#f7f9fc;color:#1a1a1a;}
+
+.urgency{background:#0d6efd;color:white;text-align:center;padding:10px;font-weight:600;}
+
+.hero{
+height:95vh;
+background:linear-gradient(rgba(0,0,0,.65),rgba(0,0,0,.65)),
+url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c');
+background-size:cover;
+background-position:center;
+display:flex;
+align-items:center;
+justify-content:center;
+text-align:center;
+color:white;
+padding:20px;
+}
+
+.hero h1{font-size:48px;max-width:900px;}
+.hero p{font-size:20px;margin:20px 0 30px;}
+
+.cta{
+background:#25D366;
+border:none;
+padding:18px 45px;
+font-size:18px;
+color:white;
+border-radius:10px;
+cursor:pointer;
+transition:.3s;
+}
+.cta:hover{transform:scale(1.06);}
+
+.benefits{
+padding:90px 8%;
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+gap:40px;
+background:white;
+}
+
+.benefit{
+background:#f2f6ff;
+padding:30px;
+border-radius:14px;
+transition:.3s;
+}
+.benefit:hover{transform:translateY(-8px);}
+
+.simulator{
+padding:100px 8%;
+display:flex;
+flex-wrap:wrap;
+gap:60px;
+align-items:center;
+justify-content:center;
+}
+
+.sim-box{
+background:white;
+padding:45px;
+border-radius:16px;
+box-shadow:0 20px 60px rgba(0,0,0,.08);
+width:420px;
+}
+
+input, select{
+width:100%;
+padding:14px;
+margin-top:12px;
+border-radius:8px;
+border:1px solid #dcdcdc;
+}
+
+.submit{
+width:100%;
+background:#0d6efd;
+color:white;
+border:none;
+padding:16px;
+margin-top:15px;
+border-radius:10px;
+font-size:16px;
+cursor:pointer;
+}
+
+.whats{
+position:fixed;
+bottom:20px;
+right:20px;
+background:#25D366;
+color:white;
+padding:18px;
+border-radius:50%;
+font-size:22px;
+text-decoration:none;
+box-shadow:0 10px 25px rgba(0,0,0,.25);
+}
+
+@media(max-width:768px){
+.hero h1{font-size:34px;}
+.hero{height:auto;padding:100px 20px;}
+}
+</style>
+</head>
+
+<body>
+
+<div class="urgency">
+⚠️ Condições especiais liberadas este mês — consulte enquanto ainda há vagas!
+</div>
+
+<section class="hero">
+<div>
+<h1>Conquiste seu imóvel ou veículo sem pagar juros abusivos</h1>
+<p>Faça uma simulação gratuita e receba um plano personalizado no WhatsApp.</p>
+<button class="cta" onclick="document.getElementById('simulador').scrollIntoView({behavior:'smooth'})">
+SIMULAR AGORA
+</button>
+</div>
+</section>
+
+<section class="simulator" id="simulador">
+
+<div class="sim-box">
+<form id="formSimulacao">
+
+<input type="text" id="nome" placeholder="Seu nome" required>
+<input type="tel" id="whatsapp" placeholder="Seu WhatsApp" required>
+
+<select id="tipo" required>
+<option value="">Tipo de consórcio</option>
+<option>Imóvel</option>
+<option>Veículo</option>
+<option>Serviços</option>
+</select>
+
+<input type="number" id="valor" placeholder="Valor desejado (R$)" required>
+
+<button type="submit" class="submit">
+Receber Simulação no WhatsApp →
+</button>
+
+</form>
+</div>
+
+</section>
+
+<a class="whats" href="https://wa.me/5519991476006" target="_blank">💬</a>
+
+<script>
+document.getElementById("formSimulacao").addEventListener("submit", function(e){
+e.preventDefault();
+
+let nome = document.getElementById("nome").value;
+let whatsapp = document.getElementById("whatsapp").value;
+let tipo = document.getElementById("tipo").value;
+let valor = document.getElementById("valor").value;
+
+let mensagem = `Olá! Quero simular um consórcio:%0A
+👤 Nome: ${nome}%0A
+📱 WhatsApp: ${whatsapp}%0A
+📌 Tipo: ${tipo}%0A
+💰 Valor desejado: R$ ${valor}`;
+
+let numero = "5519991476006"; // SEU WHATSAPP
+let url = `https://wa.me/${numero}?text=${mensagem}`;
+
+window.open(url, "_blank");
+});
+</script>
+
+</body>
+</html>
