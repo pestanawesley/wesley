@@ -631,6 +631,72 @@ label {
   display: inline-block;
 }
 
+/* ---------- Área particular (cofre) ---------- */
+.vault-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background:
+    radial-gradient(900px 500px at 100% -10%, rgba(124, 92, 255, 0.16), transparent 60%),
+    var(--bg);
+  overflow-y: auto;
+  padding: 18px 16px calc(28px + env(safe-area-inset-bottom));
+  max-width: 720px;
+  margin: 0 auto;
+}
+.vault-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.vault-x {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  font-size: 16px;
+  color: var(--muted);
+}
+.vault-x.rel {
+  position: static;
+}
+.vault-lock {
+  max-width: 360px;
+  margin: 14vh auto 0;
+  text-align: center;
+}
+.vault-lock h2 {
+  font-size: 22px;
+  margin-bottom: 6px;
+}
+.vault-emoji {
+  font-size: 48px;
+  margin-bottom: 10px;
+}
+.vault-err {
+  color: #fca5a5;
+  font-size: 13px;
+  margin-top: 10px;
+  text-align: center;
+}
+.vault-sim {
+  margin-top: 12px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+@media (min-width: 760px) {
+  .vault-screen {
+    max-width: 720px;
+  }
+}
+
 /* ---------- Dashboard em blocos ---------- */
 /* Celular: blocos empilhados com espaçamento uniforme. */
 .dash-grid {

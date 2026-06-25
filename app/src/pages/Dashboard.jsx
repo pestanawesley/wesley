@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, Tooltip } from 'recharts'
 import {
   useStore, totalBalance, monthSummary, expensesByCategory,
@@ -6,9 +7,20 @@ import {
 import { insights } from '../lib/insights'
 import { brl, currentMonthKey, monthLabel, monthShort, formatDateShort } from '../lib/format'
 
-export default function Dashboard() {
+export default function Dashboard({ onSecret }) {
   const { state } = useStore()
   const key = currentMonthKey()
+
+  // Entrada discreta: 5 toques rápidos no ícone abrem a área particular.
+  const tap = useRef({ n: 0, t: 0 })
+  const secretTap = () => {
+    const now = Date.now()
+    const r = tap.current
+    if (now - r.t > 1500) r.n = 0
+    r.t = now
+    r.n += 1
+    if (r.n >= 5) { r.n = 0; onSecret?.() }
+  }
 
   const total = totalBalance(state)
   const month = monthSummary(state, key)
@@ -23,7 +35,7 @@ export default function Dashboard() {
     <div>
       <div className="topbar">
         <div className="logo">
-          <div className="mark">💰</div>
+          <div className="mark" onClick={secretTap}>💰</div>
           <div>
             <h1>Minha Carteira</h1>
             <div className="sub">{monthLabel(key)}</div>

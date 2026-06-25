@@ -5,24 +5,34 @@ import Transactions from './pages/Transactions'
 import Bills from './pages/Bills'
 import Goals from './pages/Goals'
 import Accounts from './pages/Accounts'
+import Vault from './pages/Vault'
 import Sheet from './components/Sheet'
 import TransactionForm from './components/TransactionForm'
 
 const TABS = [
-  { id: 'home', label: 'Início', icon: '🏠', el: <Dashboard /> },
-  { id: 'tx', label: 'Lançamentos', icon: '📊', el: <Transactions /> },
-  { id: 'bills', label: 'Futuras', icon: '📅', el: <Bills /> },
-  { id: 'goals', label: 'Metas', icon: '🎯', el: <Goals /> },
-  { id: 'accounts', label: 'Contas', icon: '🏦', el: <Accounts /> },
+  { id: 'home', label: 'Início', icon: '🏠' },
+  { id: 'tx', label: 'Lançamentos', icon: '📊' },
+  { id: 'bills', label: 'Futuras', icon: '📅' },
+  { id: 'goals', label: 'Metas', icon: '🎯' },
+  { id: 'accounts', label: 'Contas', icon: '🏦' },
 ]
 
 function Shell() {
   const [tab, setTab] = useState('home')
   const [quickAdd, setQuickAdd] = useState(false)
+  const [vault, setVault] = useState(false)
+
+  const page = {
+    home: <Dashboard onSecret={() => setVault(true)} />,
+    tx: <Transactions />,
+    bills: <Bills />,
+    goals: <Goals />,
+    accounts: <Accounts />,
+  }[tab]
 
   return (
     <>
-      <div className="app">{TABS.find((t) => t.id === tab)?.el}</div>
+      <div className="app">{page}</div>
 
       {/* Botão flutuante: lançamento rápido (visível nas telas principais) */}
       {tab !== 'accounts' && (
@@ -45,6 +55,8 @@ function Shell() {
           <TransactionForm onDone={() => setQuickAdd(false)} />
         </Sheet>
       )}
+
+      {vault && <Vault onClose={() => setVault(false)} />}
     </>
   )
 }
