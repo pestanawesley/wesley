@@ -630,3 +630,73 @@ label {
   border-radius: 50%;
   display: inline-block;
 }
+
+/* ---------- Dashboard em blocos ---------- */
+/* Celular: blocos empilhados com espaçamento uniforme. */
+.dash-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.dash-grid .section-title {
+  margin: 0 4px 10px;
+}
+
+/* ====================================================================
+   DESKTOP / telas largas: layout mais compacto e em 2 colunas
+   ==================================================================== */
+@media (min-width: 760px) {
+  .app {
+    max-width: 940px;
+    padding: 16px 20px 84px;
+  }
+
+  /* Dashboard vira 2 colunas (cada bloco fica inteiro, sem quebrar). */
+  .dash-grid {
+    display: block;
+    column-count: 2;
+    column-gap: 16px;
+  }
+  .dash-grid .block {
+    break-inside: avoid;
+    margin: 0 0 16px;
+    display: block;
+  }
+
+  /* Tudo um pouco menor para caber sem rolagem. */
+  .hero-balance {
+    padding: 18px;
+  }
+  .hero-balance .val {
+    font-size: 27px;
+  }
+  .stat {
+    padding: 13px;
+  }
+  .stat .v {
+    font-size: 19px;
+  }
+  .item {
+    padding: 10px 12px;
+  }
+  .item .ic {
+    width: 36px;
+    height: 36px;
+    font-size: 17px;
+  }
+  .section-title {
+    margin: 16px 4px 8px;
+    font-size: 13px;
+  }
+
+  /* Botão flutuante alinhado ao container mais largo. */
+  .fab {
+    right: max(16px, calc(50% - 470px + 16px));
+    bottom: 78px;
+  }
+
+  /* Barra inferior central, com cara de app de desktop. */
+  .nav-inner {
+    max-width: 940px;
+  }
+}
