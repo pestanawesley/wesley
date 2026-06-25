@@ -142,6 +142,10 @@ function InstallmentCard({ inst, onEdit, onDelete }) {
         <span><b>Parcela {st.current} de {st.total}</b> · faltam {st.restantes}</span>
         <span className="muted">restam {brl(st.totalRestante)}</span>
       </div>
+      <div className="spread" style={{ fontSize: 12.5, marginTop: 4 }}>
+        <span className="muted">Já paguei</span>
+        <span className="pos">{brl(st.paid)}</span>
+      </div>
       <div className="spread" style={{ marginTop: 6, fontSize: 12 }}>
         <span className="muted">
           Próxima: {formatDate(st.nextDue)}{' '}
@@ -172,6 +176,7 @@ export function InstallmentForm({ onClose, editing }) {
   const [linkMinWage, setLinkMinWage] = useState(!!editing?.linkMinWage)
   const [minWageFraction, setMinWageFraction] = useState(editing?.minWageFraction ? fmt(editing.minWageFraction) : '0,5')
   const [minWage, setMinWage] = useState(state.settings?.minWage ? fmt(state.settings.minWage) : '')
+  const [paidBase, setPaidBase] = useState(editing?.paidBase ? fmt(editing.paidBase) : '')
 
   const computedValue = round2(parse(minWageFraction) * parse(minWage))
 
@@ -193,12 +198,18 @@ export function InstallmentForm({ onClose, editing }) {
       if (!(value > 0)) return alert('Informe o valor da parcela.')
     }
 
+    const pb = parse(paidBase)
+    const paidFields = pb > 0
+      ? { paidBase: pb, paidBaseParcela: installmentStatus({ firstDate, totalInstallments: tot }).pagas }
+      : { paidBase: undefined, paidBaseParcela: undefined }
+
     const payload = {
       description: description.trim(), installmentValue: value, totalInstallments: tot,
       firstDate, categoryId, target,
       cardId: target === 'cartao' ? cardId : undefined,
       accountId: target === 'conta' ? accountId : undefined,
       linkMinWage, minWageFraction: linkMinWage ? parse(minWageFraction) : undefined,
+      ...paidFields,
     }
     if (editing) dispatch({ type: 'UPDATE_INSTALLMENT', payload: { ...payload, id: editing.id } })
     else dispatch({ type: 'ADD_INSTALLMENT', payload })
@@ -256,6 +267,13 @@ export function InstallmentForm({ onClose, editing }) {
         <div className="field">
           <label>Data da 1ª parcela</label>
           <input type="date" value={firstDate} onChange={(e) => setFirstDate(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Já paguei até hoje (opcional)</label>
+          <input inputMode="decimal" placeholder="Deixe vazio p/ calcular automático" value={paidBase} onChange={(e) => setPaidBase(e.target.value)} />
+          <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+            Útil quando o valor mudou ao longo do tempo (ex.: pensão ligada ao mínimo). Em branco = nº de parcelas pagas × valor atual.
+          </div>
         </div>
         <div className="field">
           <label>Categoria</label>

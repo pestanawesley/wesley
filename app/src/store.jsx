@@ -400,8 +400,10 @@ export function installmentStatus(inst, today = todayISO()) {
   }
   const restantes = total - pagas
   const current = Math.min(total, pagas + 1)
+  // Já pago: histórico informado (paidBase até paidBaseParcela) + parcelas novas × valor.
+  const paid = (inst.paidBase || 0) + Math.max(0, pagas - (inst.paidBaseParcela || 0)) * (inst.installmentValue || 0)
   return {
-    total, pagas, restantes, current,
+    total, pagas, restantes, current, paid,
     nextDue: addMonthsISO(inst.firstDate, Math.min(pagas, total - 1)),
     totalRestante: restantes * inst.installmentValue,
     done: restantes <= 0,
