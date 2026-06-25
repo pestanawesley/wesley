@@ -694,8 +694,8 @@ label {
 @media (min-width: 760px) {
   /* Área particular compacta no desktop: coluna única, estreita e menor. */
   .vault-screen {
-    max-width: 480px;
-    zoom: 0.85;
+    max-width: 430px;
+    zoom: 0.75;
   }
 }
 
