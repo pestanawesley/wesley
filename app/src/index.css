@@ -692,16 +692,10 @@ label {
 }
 
 @media (min-width: 760px) {
-  /* Área particular mais compacta no desktop, dívidas em 2 colunas. */
+  /* Área particular compacta no desktop: coluna única, estreita e menor. */
   .vault-screen {
-    max-width: 940px;
-    zoom: 0.9;
-  }
-  .vault-screen .list {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    align-items: start;
+    max-width: 480px;
+    zoom: 0.85;
   }
 }
 
