@@ -129,6 +129,10 @@ function reducer(state, action) {
     case 'DELETE_INSTALLMENT':
       return { ...state, installments: (state.installments || []).filter((i) => i.id !== action.id) }
 
+    // ---- Carteira em uso (filtro Pessoal / Empresa / Tudo) ----
+    case 'SET_WALLET':
+      return { ...state, viewWallet: action.value }
+
     // Salário mínimo: atualiza o valor e recalcula itens vinculados (ex.: pensão).
     case 'SET_MINWAGE': {
       const mw = action.value
@@ -252,6 +256,29 @@ export function categoryById(state, id) {
 }
 export function accountById(state, id) {
   return state.accounts.find((a) => a.id === id)
+}
+
+export const accountWallet = (a) => a?.wallet || 'pessoal'
+
+// Existe alguma conta marcada como "empresa"? (define se mostramos o filtro)
+export function hasMultipleWallets(state) {
+  return state.accounts.some((a) => accountWallet(a) === 'empresa')
+}
+
+// Retorna uma "visão" do estado filtrada por carteira (pessoal/empresa/tudo).
+// Reaproveita todos os cálculos: é só passar scopeState(state, wallet) no lugar de state.
+export function scopeState(state, wallet) {
+  if (!wallet || wallet === 'tudo') return state
+  const ids = new Set(state.accounts.filter((a) => accountWallet(a) === wallet).map((a) => a.id))
+  return {
+    ...state,
+    accounts: state.accounts.filter((a) => ids.has(a.id)),
+    transactions: state.transactions.filter((t) => ids.has(t.accountId) || ids.has(t.toAccountId)),
+    bills: state.bills.filter((b) => !b.accountId || ids.has(b.accountId)),
+    recurrences: state.recurrences.filter((r) => ids.has(r.accountId)),
+    installments: (state.installments || []).filter((i) => ids.has(i.accountId) || ids.has(i.cardId)),
+    goals: wallet === 'empresa' ? [] : state.goals, // metas são pessoais
+  }
 }
 
 // Saldo atual de uma conta = saldo inicial +/- transações (inclui transferências).

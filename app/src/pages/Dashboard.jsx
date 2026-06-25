@@ -3,13 +3,15 @@ import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, Tooltip
 import {
   useStore, totalBalance, monthSummary, expensesByCategory,
   projectedBalance, netWorth, monthlyTrend, categoryById, accountById,
-  monthlyPlan, payoffTimeline, upcomingDues,
+  monthlyPlan, payoffTimeline, upcomingDues, scopeState,
 } from '../store'
 import { insights } from '../lib/insights'
 import { brl, currentMonthKey, monthKey, monthLabel, monthShort, formatDateShort } from '../lib/format'
+import WalletFilter from '../components/WalletFilter'
 
 export default function Dashboard({ onSecret }) {
-  const { state } = useStore()
+  const { state: fullState } = useStore()
+  const state = scopeState(fullState, fullState.viewWallet) // visão filtrada por carteira
   const key = currentMonthKey()
 
   // Entrada discreta: 5 toques rápidos no ícone abrem a área particular.
@@ -69,6 +71,8 @@ export default function Dashboard({ onSecret }) {
           </div>
         </div>
       </div>
+
+      <WalletFilter />
 
       <div className="dash-grid">
         {/* Saldo total */}

@@ -18,6 +18,7 @@ const empty = () => ({
   installments: [], // parcelados (pensão, financiamento, compras parceladas)
   goals: [], // metas / objetivos
   settings: { minWage: 0 }, // salário mínimo (para itens vinculados, ex.: pensão)
+  viewWallet: 'tudo', // filtro de carteira em uso (tudo | pessoal | empresa)
   meta: { createdAt: new Date().toISOString() },
 })
 

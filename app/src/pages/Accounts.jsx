@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { useStore, accountBalance, totalBalance, openInvoiceTotal } from '../store'
+import { useStore, accountBalance, totalBalance, openInvoiceTotal, scopeState } from '../store'
 import { brl } from '../lib/format'
 import * as db from '../lib/db'
 import { seed } from '../lib/seed'
 import Sheet from '../components/Sheet'
 import TransferForm from '../components/TransferForm'
 import Invoice from '../components/Invoice'
+import WalletFilter from '../components/WalletFilter'
 
 const TYPES = [
   { v: 'banco', l: 'Conta de banco', icon: '🏦' },
@@ -16,13 +17,14 @@ const TYPES = [
 const iconFor = (t) => TYPES.find((x) => x.v === t)?.icon || '🏦'
 
 export default function Accounts() {
-  const { state, dispatch } = useStore()
+  const { state: fullState, dispatch } = useStore()
+  const state = scopeState(fullState, fullState.viewWallet)
   const [adding, setAdding] = useState(false)
   const [transferring, setTransferring] = useState(false)
   const [invoiceCard, setInvoiceCard] = useState(null)
 
   const exportData = () => {
-    const blob = new Blob([db.exportJSON(state)], { type: 'application/json' })
+    const blob = new Blob([db.exportJSON(fullState)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -57,6 +59,8 @@ export default function Accounts() {
     <div>
       <div className="topbar"><h1>Contas & Cartões</h1></div>
 
+      <WalletFilter />
+
       <div className="hero-balance">
         <div className="lbl">Patrimônio em contas</div>
         <div className="val">{brl(totalBalance(state))}</div>
@@ -76,7 +80,9 @@ export default function Accounts() {
             <div className="item" key={a.id} onClick={() => isCard && setInvoiceCard(a)} style={isCard ? { cursor: 'pointer' } : {}}>
               <div className="ic" style={{ background: (a.color || '#334') + '33' }}>{iconFor(a.type)}</div>
               <div className="body">
-                <div className="t">{a.name} {isCard && <span className="muted" style={{ fontSize: 12 }}>›</span>}</div>
+                <div className="t">
+                  {a.name} {a.wallet === 'empresa' && <span className="badge ok">🏢</span>} {isCard && <span className="muted" style={{ fontSize: 12 }}>›</span>}
+                </div>
                 <div className="s">
                   {isCard
                     ? `Fatura aberta · vence dia ${a.dueDay}`
@@ -172,6 +178,7 @@ function AccountForm({ onClose }) {
   const [initialBalance, setInitialBalance] = useState('')
   const [closingDay, setClosingDay] = useState('28')
   const [dueDay, setDueDay] = useState('10')
+  const [wallet, setWallet] = useState('pessoal')
   const colors = ['#3b82f6', '#22c55e', '#a855f7', '#f59e0b', '#ec4899', '#14b8a6']
   const [color, setColor] = useState(colors[0])
 
@@ -183,7 +190,7 @@ function AccountForm({ onClose }) {
       ? { closingDay: Math.min(31, Math.max(1, parseInt(closingDay, 10) || 28)),
           dueDay: Math.min(31, Math.max(1, parseInt(dueDay, 10) || 10)) }
       : {}
-    dispatch({ type: 'ADD_ACCOUNT', payload: { name: name.trim(), type, initialBalance: bal, color, ...extra } })
+    dispatch({ type: 'ADD_ACCOUNT', payload: { name: name.trim(), type, initialBalance: bal, color, wallet, ...extra } })
     onClose()
   }
 
@@ -199,6 +206,13 @@ function AccountForm({ onClose }) {
         <div className="field">
           <label>Nome</label>
           <input placeholder="Ex.: Nubank, Itaú, Dinheiro..." value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+        </div>
+        <div className="field">
+          <label>Carteira</label>
+          <select value={wallet} onChange={(e) => setWallet(e.target.value)}>
+            <option value="pessoal">👤 Pessoal</option>
+            <option value="empresa">🏢 Empresa</option>
+          </select>
         </div>
         {type === 'cartao' ? (
           <div className="field-row">

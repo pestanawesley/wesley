@@ -1,13 +1,15 @@
 import { useState } from 'react'
-import { useStore, categoryById, accountById, monthSummary } from '../store'
+import { useStore, categoryById, accountById, monthSummary, scopeState } from '../store'
 import { brl, monthKey, currentMonthKey, monthLabel, shiftMonth, formatDate } from '../lib/format'
 import Sheet from '../components/Sheet'
 import TransactionForm from '../components/TransactionForm'
 import ImportCSV from '../components/ImportCSV'
+import WalletFilter from '../components/WalletFilter'
 import { delPhoto } from '../lib/photos'
 
 export default function Transactions() {
-  const { state, dispatch } = useStore()
+  const { state: fullState, dispatch } = useStore()
+  const state = scopeState(fullState, fullState.viewWallet)
   const [key, setKey] = useState(currentMonthKey())
   const [filter, setFilter] = useState('todos') // todos | gasto | ganho
   const [editing, setEditing] = useState(null)
@@ -26,6 +28,8 @@ export default function Transactions() {
         <h1 style={{ fontSize: 20, fontWeight: 800 }}>Lançamentos</h1>
         <button className="chip" onClick={() => setImporting(true)}>⬆️ Importar CSV</button>
       </div>
+
+      <WalletFilter />
 
       {/* Navegação de mês */}
       <div className="spread card" style={{ padding: '10px 14px' }}>

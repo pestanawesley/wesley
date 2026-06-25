@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import { useStore, openBills, categoryById, accountById, activeInstallments, installmentStatus } from '../store'
+import { useStore, openBills, categoryById, accountById, activeInstallments, installmentStatus, scopeState } from '../store'
 import { brl, formatDate, daysUntil, todayISO } from '../lib/format'
 import Sheet from '../components/Sheet'
 import Calendar from './Calendar'
 import Recurrences from '../components/Recurrences'
+import WalletFilter from '../components/WalletFilter'
 
 export default function Bills() {
-  const { state, dispatch } = useStore()
+  const { state: fullState, dispatch } = useStore()
+  const state = scopeState(fullState, fullState.viewWallet)
   const [adding, setAdding] = useState(false)
   const [addingInst, setAddingInst] = useState(false)
   const [editingInst, setEditingInst] = useState(null)
@@ -29,6 +31,8 @@ export default function Bills() {
         <h1 style={{ fontSize: 20, fontWeight: 800 }}>Contas futuras</h1>
         <button className="chip" onClick={() => setShowRec(true)}>🔁 Recorrentes</button>
       </div>
+
+      <WalletFilter />
 
       <div className="toggle">
         <button type="button" className={view === 'lista' ? 'on-ganho' : ''} onClick={() => setView('lista')}>📋 Lista</button>
