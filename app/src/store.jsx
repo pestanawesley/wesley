@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useReducer } from 'react'
 import * as db from './lib/db'
 import { seed } from './lib/seed'
-import { uid, currentMonthKey, monthKey, todayISO, isoForDay, addDaysISO, shiftMonth } from './lib/format'
+import { uid, currentMonthKey, monthKey, todayISO, isoForDay, addDaysISO, shiftMonth, addMonthsISO, monthsDiffKeys } from './lib/format'
 
 // Datas em que uma recorrência mensal "acontece", do início até o horizonte.
 function recurrenceOccurrences(rec, horizonISO) {
@@ -115,6 +115,19 @@ function reducer(state, action) {
       }
     case 'DELETE_RECURRENCE':
       return { ...state, recurrences: state.recurrences.filter((r) => r.id !== action.id) }
+
+    // ---- Parcelados (pensão, financiamento, compras parceladas) ----
+    case 'ADD_INSTALLMENT':
+      return { ...state, installments: [...(state.installments || []), { ...action.payload, id: uid() }] }
+    case 'UPDATE_INSTALLMENT':
+      return {
+        ...state,
+        installments: (state.installments || []).map((i) =>
+          i.id === action.payload.id ? { ...i, ...action.payload } : i,
+        ),
+      }
+    case 'DELETE_INSTALLMENT':
+      return { ...state, installments: (state.installments || []).filter((i) => i.id !== action.id) }
 
     // Gera lançamentos/contas das recorrências ativas (idempotente).
     case 'MATERIALIZE': {
@@ -312,6 +325,21 @@ export function cardInvoices(state, cardId) {
       g.purchases.push(t)
       groups.set(key, g)
     })
+  // Parcelados vinculados a este cartão: cada parcela já lançada entra na fatura.
+  const nowK = currentMonthKey()
+  for (const inst of state.installments || []) {
+    if (inst.target !== 'cartao' || inst.cardId !== cardId) continue
+    for (let n = 1; n <= inst.totalInstallments; n++) {
+      const due = addMonthsISO(inst.firstDate, n - 1)
+      if (monthKey(due) > nowK) break // parcelas futuras ainda não foram lançadas
+      const key = invoiceKeyFor(due, closingDay)
+      const g = groups.get(key) || { key, total: 0, purchases: [], paid: 0 }
+      g.total += inst.installmentValue
+      g.purchases.push({ id: `${inst.id}-${n}`, description: `${inst.description} (${n}/${inst.totalInstallments})`, amount: inst.installmentValue, date: due, categoryId: inst.categoryId })
+      groups.set(key, g)
+    }
+  }
+
   // Pagamentos (transferências para o cartão), associados pela invoiceKey
   state.transactions
     .filter((t) => t.type === 'transferencia' && t.toAccountId === cardId && t.invoiceKey)
@@ -345,12 +373,46 @@ export function billsInMonth(state, key) {
     .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
 }
 
+// ---- Parcelados ----
+// Situação de um parcelamento: conta como pagas as parcelas cuja data já passou.
+export function installmentStatus(inst, today = todayISO()) {
+  const total = inst.totalInstallments
+  let pagas = 0
+  for (let n = 1; n <= total; n++) {
+    if (addMonthsISO(inst.firstDate, n - 1) <= today) pagas++
+    else break
+  }
+  const restantes = total - pagas
+  const current = Math.min(total, pagas + 1)
+  return {
+    total, pagas, restantes, current,
+    nextDue: addMonthsISO(inst.firstDate, Math.min(pagas, total - 1)),
+    totalRestante: restantes * inst.installmentValue,
+    done: restantes <= 0,
+  }
+}
+
+export function activeInstallments(state) {
+  return (state.installments || [])
+    .filter((i) => !installmentStatus(i).done)
+    .sort((a, b) => installmentStatus(a).nextDue.localeCompare(installmentStatus(b).nextDue))
+}
+
+// Parcelas (fora do cartão) que vencem no mês — entram na projeção como "a pagar".
+function installmentsToPay(state, key) {
+  return (state.installments || []).reduce((s, i) => {
+    if (i.target === 'cartao') return s // já contam via fatura do cartão
+    const st = installmentStatus(i, key)
+    return st.done ? s : monthKey(st.nextDue) === key ? s + i.installmentValue : s
+  }, 0)
+}
+
 // Saldo projetado para o fim do mês = saldo de hoje + a receber - a pagar (pendentes do mês)
 export function projectedBalance(state, key = currentMonthKey()) {
   const base = totalBalance(state)
   const pend = openBills(state).filter((b) => monthKey(b.dueDate) === key)
   const toReceive = pend.filter((b) => b.type === 'receber').reduce((s, b) => s + b.amount, 0)
-  const toPay = pend.filter((b) => b.type === 'pagar').reduce((s, b) => s + b.amount, 0)
+  const toPay = pend.filter((b) => b.type === 'pagar').reduce((s, b) => s + b.amount, 0) + installmentsToPay(state, key)
   return { projected: base + toReceive - toPay, toReceive, toPay, base }
 }
 

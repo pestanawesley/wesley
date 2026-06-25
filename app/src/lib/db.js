@@ -15,6 +15,7 @@ const empty = () => ({
   transactions: [],
   bills: [], // contas futuras (a pagar / a receber)
   recurrences: [], // lançamentos recorrentes (salário, aluguel, assinaturas)
+  installments: [], // parcelados (pensão, financiamento, compras parceladas)
   goals: [], // metas / objetivos
   meta: { createdAt: new Date().toISOString() },
 })

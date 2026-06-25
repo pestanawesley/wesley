@@ -82,6 +82,22 @@ export const addDaysISO = (iso, days) => {
   return d.toISOString().slice(0, 10)
 }
 
+// Soma N meses a uma data ISO (preserva o dia, com clamp no fim do mês).
+export const addMonthsISO = (iso, n) => {
+  const [y, m, d] = iso.split('-').map(Number)
+  const target = new Date(y, m - 1 + n, 1)
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate()
+  const day = Math.min(d, lastDay)
+  return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+// Diferença em meses entre duas chaves "YYYY-MM" (b - a).
+export const monthsDiffKeys = (a, b) => {
+  const [ay, am] = a.split('-').map(Number)
+  const [by, bm] = b.split('-').map(Number)
+  return (by - ay) * 12 + (bm - am)
+}
+
 // ---------- Frequência / períodos (mensal, semanal, quinzenal) ----------
 
 // Avança uma data ISO em um período conforme a frequência.

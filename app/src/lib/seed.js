@@ -34,6 +34,7 @@ export function seed() {
     transactions: [],
     bills: [],
     recurrences: [],
+    installments: [],
     goals: [],
     meta: { createdAt: new Date().toISOString(), seeded: true },
   }
