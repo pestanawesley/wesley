@@ -3,7 +3,8 @@ const CACHE = 'minha-carteira-v1'
 
 self.addEventListener('install', (e) => {
   self.skipWaiting()
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['/', '/index.html'])))
+  // Caminhos relativos ao escopo do SW (funciona em "/" ou em subpasta como /wesley/).
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', './index.html'])))
 })
 
 self.addEventListener('activate', (e) => {
