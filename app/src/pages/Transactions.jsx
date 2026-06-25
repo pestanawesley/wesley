@@ -50,8 +50,23 @@ export default function Transactions() {
           <div className="empty"><div className="big">🗂️</div>Nenhum lançamento neste mês.</div>
         ) : (
           txs.map((t) => {
-            const cat = categoryById(state, t.categoryId)
             const acc = accountById(state, t.accountId)
+            if (t.type === 'transferencia') {
+              const to = accountById(state, t.toAccountId)
+              return (
+                <div className="item" key={t.id} onClick={() => {
+                  if (confirm('Excluir esta transferência?')) dispatch({ type: 'DELETE_TX', id: t.id })
+                }}>
+                  <div className="ic" style={{ background: '#5b8cff22' }}>🔄</div>
+                  <div className="body">
+                    <div className="t">{t.description || 'Transferência'}</div>
+                    <div className="s">{formatDate(t.date)} · {acc?.name} → {to?.name}</div>
+                  </div>
+                  <div className="amt muted">{brl(t.amount)}</div>
+                </div>
+              )
+            }
+            const cat = categoryById(state, t.categoryId)
             return (
               <div className="item" key={t.id} onClick={() => setEditing(t)}>
                 <div className="ic" style={{ background: (cat?.color || '#334') + '33' }}>{cat?.icon || '📦'}</div>

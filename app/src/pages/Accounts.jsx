@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import { useStore, accountBalance, totalBalance } from '../store'
+import { useStore, accountBalance, totalBalance, openInvoiceTotal } from '../store'
 import { brl } from '../lib/format'
 import * as db from '../lib/db'
 import { seed } from '../lib/seed'
 import Sheet from '../components/Sheet'
+import TransferForm from '../components/TransferForm'
+import Invoice from '../components/Invoice'
 
 const TYPES = [
   { v: 'banco', l: 'Conta de banco', icon: '🏦' },
@@ -16,6 +18,8 @@ const iconFor = (t) => TYPES.find((x) => x.v === t)?.icon || '🏦'
 export default function Accounts() {
   const { state, dispatch } = useStore()
   const [adding, setAdding] = useState(false)
+  const [transferring, setTransferring] = useState(false)
+  const [invoiceCard, setInvoiceCard] = useState(null)
 
   const exportData = () => {
     const blob = new Blob([db.exportJSON(state)], { type: 'application/json' })
@@ -58,24 +62,36 @@ export default function Accounts() {
         <div className="val">{brl(totalBalance(state))}</div>
       </div>
 
-      <button className="btn primary full mt" onClick={() => setAdding(true)}>+ Nova conta</button>
+      <div className="field-row mt">
+        <button className="btn primary" onClick={() => setAdding(true)}>+ Nova conta</button>
+        <button className="btn" onClick={() => setTransferring(true)}>🔄 Transferir</button>
+      </div>
 
       <div className="list" style={{ marginTop: 14 }}>
         {state.accounts.map((a) => {
+          const isCard = a.type === 'cartao'
           const bal = accountBalance(state, a.id)
+          const openInv = isCard ? openInvoiceTotal(state, a.id) : 0
           return (
-            <div className="item" key={a.id}>
+            <div className="item" key={a.id} onClick={() => isCard && setInvoiceCard(a)} style={isCard ? { cursor: 'pointer' } : {}}>
               <div className="ic" style={{ background: (a.color || '#334') + '33' }}>{iconFor(a.type)}</div>
               <div className="body">
-                <div className="t">{a.name}</div>
-                <div className="s">{TYPES.find((t) => t.v === a.type)?.l}</div>
+                <div className="t">{a.name} {isCard && <span className="muted" style={{ fontSize: 12 }}>›</span>}</div>
+                <div className="s">
+                  {isCard
+                    ? `Fatura aberta · vence dia ${a.dueDay}`
+                    : TYPES.find((t) => t.v === a.type)?.l}
+                </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div className={`amt ${bal < 0 ? 'neg' : ''}`}>{brl(bal)}</div>
+                <div className={`amt ${(isCard ? openInv > 0 : bal < 0) ? 'neg' : ''}`}>
+                  {isCard ? brl(openInv) : brl(bal)}
+                </div>
                 <button
                   className="del"
-                  onClick={() => {
-                    const has = state.transactions.some((t) => t.accountId === a.id)
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    const has = state.transactions.some((t) => t.accountId === a.id || t.toAccountId === a.id)
                     if (has) return alert('Esta conta tem lançamentos. Exclua-os antes de remover a conta.')
                     if (confirm('Excluir conta?')) dispatch({ type: 'DELETE_ACCOUNT', id: a.id })
                   }}
@@ -100,6 +116,18 @@ export default function Accounts() {
       </div>
 
       {adding && <AccountForm onClose={() => setAdding(false)} />}
+
+      {transferring && (
+        <Sheet title="Transferir entre contas" onClose={() => setTransferring(false)}>
+          <TransferForm onDone={() => setTransferring(false)} />
+        </Sheet>
+      )}
+
+      {invoiceCard && (
+        <Sheet title={`Fatura · ${invoiceCard.name}`} onClose={() => setInvoiceCard(null)}>
+          <Invoice card={invoiceCard} onClose={() => setInvoiceCard(null)} />
+        </Sheet>
+      )}
     </div>
   )
 }
@@ -109,6 +137,8 @@ function AccountForm({ onClose }) {
   const [name, setName] = useState('')
   const [type, setType] = useState('banco')
   const [initialBalance, setInitialBalance] = useState('')
+  const [closingDay, setClosingDay] = useState('28')
+  const [dueDay, setDueDay] = useState('10')
   const colors = ['#3b82f6', '#22c55e', '#a855f7', '#f59e0b', '#ec4899', '#14b8a6']
   const [color, setColor] = useState(colors[0])
 
@@ -116,7 +146,11 @@ function AccountForm({ onClose }) {
     e.preventDefault()
     if (!name.trim()) return alert('Dê um nome à conta.')
     const bal = parseFloat(String(initialBalance).replace(/\./g, '').replace(',', '.')) || 0
-    dispatch({ type: 'ADD_ACCOUNT', payload: { name: name.trim(), type, initialBalance: bal, color } })
+    const extra = type === 'cartao'
+      ? { closingDay: Math.min(31, Math.max(1, parseInt(closingDay, 10) || 28)),
+          dueDay: Math.min(31, Math.max(1, parseInt(dueDay, 10) || 10)) }
+      : {}
+    dispatch({ type: 'ADD_ACCOUNT', payload: { name: name.trim(), type, initialBalance: bal, color, ...extra } })
     onClose()
   }
 
@@ -133,10 +167,23 @@ function AccountForm({ onClose }) {
           <label>Nome</label>
           <input placeholder="Ex.: Nubank, Itaú, Dinheiro..." value={name} onChange={(e) => setName(e.target.value)} autoFocus />
         </div>
-        <div className="field">
-          <label>Saldo atual (quanto tem hoje)</label>
-          <input inputMode="decimal" placeholder="0,00" value={initialBalance} onChange={(e) => setInitialBalance(e.target.value)} />
-        </div>
+        {type === 'cartao' ? (
+          <div className="field-row">
+            <div className="field">
+              <label>Dia de fechamento</label>
+              <input type="number" min="1" max="31" value={closingDay} onChange={(e) => setClosingDay(e.target.value)} />
+            </div>
+            <div className="field">
+              <label>Dia de vencimento</label>
+              <input type="number" min="1" max="31" value={dueDay} onChange={(e) => setDueDay(e.target.value)} />
+            </div>
+          </div>
+        ) : (
+          <div className="field">
+            <label>Saldo atual (quanto tem hoje)</label>
+            <input inputMode="decimal" placeholder="0,00" value={initialBalance} onChange={(e) => setInitialBalance(e.target.value)} />
+          </div>
+        )}
         <div className="field">
           <label>Cor</label>
           <div className="chips">

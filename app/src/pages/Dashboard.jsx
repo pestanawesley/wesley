@@ -16,7 +16,7 @@ export default function Dashboard() {
   const proj = projectedBalance(state, key)
   const nw = netWorth(state)
   const trend = monthlyTrend(state, 6)
-  const recent = state.transactions.slice(0, 5)
+  const recent = state.transactions.filter((t) => t.type !== 'transferencia').slice(0, 5)
   const alerts = insights(state)
 
   return (

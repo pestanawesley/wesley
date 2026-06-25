@@ -225,13 +225,20 @@ export function accountById(state, id) {
   return state.accounts.find((a) => a.id === id)
 }
 
-// Saldo atual de uma conta = saldo inicial +/- transações já realizadas
+// Saldo atual de uma conta = saldo inicial +/- transações (inclui transferências).
+// Para cartão de crédito, o saldo fica negativo (dívida = fatura em aberto).
 export function accountBalance(state, accountId) {
   const acc = accountById(state, accountId)
   if (!acc) return 0
-  return state.transactions
-    .filter((t) => t.accountId === accountId)
-    .reduce((sum, t) => sum + (t.type === 'ganho' ? t.amount : -t.amount), Number(acc.initialBalance) || 0)
+  return state.transactions.reduce((sum, t) => {
+    if (t.type === 'transferencia') {
+      if (t.accountId === accountId) return sum - t.amount // saiu
+      if (t.toAccountId === accountId) return sum + t.amount // entrou
+      return sum
+    }
+    if (t.accountId !== accountId) return sum
+    return sum + (t.type === 'ganho' ? t.amount : -t.amount)
+  }, Number(acc.initialBalance) || 0)
 }
 
 // Saldo total disponível (soma de todas as contas)
@@ -239,12 +246,13 @@ export function totalBalance(state) {
   return state.accounts.reduce((sum, a) => sum + accountBalance(state, a.id), 0)
 }
 
-// Resumo de um mês: entradas, saídas e o que sobrou
+// Resumo de um mês: entradas, saídas e o que sobrou (transferências não contam)
 export function monthSummary(state, key = currentMonthKey()) {
   const txs = state.transactions.filter((t) => monthKey(t.date) === key)
   const income = txs.filter((t) => t.type === 'ganho').reduce((s, t) => s + t.amount, 0)
   const expense = txs.filter((t) => t.type === 'gasto').reduce((s, t) => s + t.amount, 0)
-  return { income, expense, balance: income - expense, count: txs.length }
+  const count = txs.filter((t) => t.type === 'ganho' || t.type === 'gasto').length
+  return { income, expense, balance: income - expense, count }
 }
 
 // Gastos do mês agrupados por categoria (para o gráfico)
@@ -267,6 +275,67 @@ export function openBills(state) {
   return state.bills
     .filter((b) => b.status !== 'pago')
     .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
+}
+
+// ---- Cartão de crédito / faturas ----
+
+// Em qual fatura (competência YYYY-MM) cai uma compra, dado o dia de fechamento.
+export function invoiceKeyFor(dateISO, closingDay) {
+  let [y, m, d] = dateISO.split('-').map(Number)
+  if (d > closingDay) { m++; if (m > 12) { m = 1; y++ } }
+  return `${y}-${String(m).padStart(2, '0')}`
+}
+
+// Vencimento de uma fatura (competência key), dado o dia de vencimento e fechamento.
+function invoiceDueDate(key, dueDay, closingDay) {
+  let [y, m] = key.split('-').map(Number)
+  if (dueDay <= closingDay) { m++; if (m > 12) { m = 1; y++ } } // vence no mês seguinte
+  const day = Math.min(dueDay, new Date(y, m, 0).getDate())
+  return `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+// Faturas de um cartão: agrupa compras por competência, calcula total e se foi paga.
+export function cardInvoices(state, cardId) {
+  const card = accountById(state, cardId)
+  if (!card) return []
+  const closingDay = card.closingDay || 1
+  const dueDay = card.dueDay || 10
+
+  const groups = new Map()
+  // Compras (gastos no cartão)
+  state.transactions
+    .filter((t) => t.type === 'gasto' && t.accountId === cardId)
+    .forEach((t) => {
+      const key = invoiceKeyFor(t.date, closingDay)
+      const g = groups.get(key) || { key, total: 0, purchases: [], paid: 0 }
+      g.total += t.amount
+      g.purchases.push(t)
+      groups.set(key, g)
+    })
+  // Pagamentos (transferências para o cartão), associados pela invoiceKey
+  state.transactions
+    .filter((t) => t.type === 'transferencia' && t.toAccountId === cardId && t.invoiceKey)
+    .forEach((t) => {
+      const g = groups.get(t.invoiceKey) || { key: t.invoiceKey, total: 0, purchases: [], paid: 0 }
+      g.paid += t.amount
+      groups.set(t.invoiceKey, g)
+    })
+
+  return [...groups.values()]
+    .map((g) => ({
+      ...g,
+      dueDate: invoiceDueDate(g.key, dueDay, closingDay),
+      isPaid: g.paid >= g.total - 0.005 && g.total > 0,
+    }))
+    .filter((g) => g.total > 0)
+    .sort((a, b) => b.key.localeCompare(a.key))
+}
+
+// Total da fatura em aberto (não paga) de um cartão.
+export function openInvoiceTotal(state, cardId) {
+  return cardInvoices(state, cardId)
+    .filter((inv) => !inv.isPaid)
+    .reduce((s, inv) => s + (inv.total - inv.paid), 0)
 }
 
 // Todas as contas (pagas e pendentes) com vencimento num mês — para o calendário
