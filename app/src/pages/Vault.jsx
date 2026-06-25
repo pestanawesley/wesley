@@ -111,6 +111,13 @@ function VaultHome({ data, update, onClose }) {
 
   const addDebt = (d) => update({ ...data, debts: [...debts, { ...d, id: uid(), payments: [] }] })
   const delDebt = (id) => update({ ...data, debts: debts.filter((d) => d.id !== id) })
+  const delPayment = (debtId, payId) =>
+    update({
+      ...data,
+      debts: debts.map((d) =>
+        d.id === debtId ? { ...d, payments: (d.payments || []).filter((p) => p.id !== payId) } : d,
+      ),
+    })
   const addPayment = (debtId, { amount, juros, date }) =>
     update({
       ...data,
@@ -197,6 +204,7 @@ function VaultHome({ data, update, onClose }) {
               onPayInterest={() => setPaying({ debt: d, mode: 'juros' })}
               onPay={() => setPaying({ debt: d, mode: 'normal' })}
               onDelete={() => confirm2('Excluir esta dívida?') && delDebt(d.id)}
+              onDelPayment={(payId) => confirm2('Apagar este pagamento?') && delPayment(d.id, payId)}
             />
           ))
         )}
@@ -229,7 +237,7 @@ function juroLabel(d) {
   return d.juroTipo === 'percent' ? `${d.juroPercent}%/${per}` : `${brl(d.juroValor)}/${per}`
 }
 
-function DebtCard({ d, s, onPayInterest, onPay, onDelete }) {
+function DebtCard({ d, s, onPayInterest, onPay, onDelete, onDelPayment }) {
   const [open, setOpen] = useState(false)
   const pct = (s.principalPaid + s.balance) > 0 ? Math.round((s.principalPaid / (s.principalPaid + s.balance)) * 100) : 0
   const dn = d.proximoVencimento ? daysUntil(d.proximoVencimento) : null
@@ -285,7 +293,10 @@ function DebtCard({ d, s, onPayInterest, onPay, onDelete }) {
               return (
                 <div className="spread" key={p.id} style={{ fontSize: 12.5, padding: '4px 0' }}>
                   <span className="muted">{formatDateShort(p.date)}</span>
-                  <span>{brl(p.amount)} <span className="muted">({brl(a.interest)} juros · {brl(a.principal)} abateu)</span></span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {brl(p.amount)} <span className="muted">({brl(a.interest)} juros · {brl(a.principal)} abateu)</span>
+                    <button type="button" className="del" style={{ padding: '0 4px' }} onClick={() => onDelPayment(p.id)}>✕</button>
+                  </span>
                 </div>
               )
             })}
