@@ -33,6 +33,11 @@ function reducer(state, action) {
     // ---- Transações (gastos / ganhos) ----
     case 'ADD_TX':
       return { ...state, transactions: [{ ...action.payload, id: uid() }, ...state.transactions] }
+    case 'IMPORT_TX':
+      return {
+        ...state,
+        transactions: [...action.payload.map((t) => ({ ...t, id: uid() })), ...state.transactions],
+      }
     case 'UPDATE_TX':
       return {
         ...state,

@@ -3,12 +3,15 @@ import { useStore, categoryById, accountById, monthSummary } from '../store'
 import { brl, monthKey, currentMonthKey, monthLabel, shiftMonth, formatDate } from '../lib/format'
 import Sheet from '../components/Sheet'
 import TransactionForm from '../components/TransactionForm'
+import ImportCSV from '../components/ImportCSV'
+import { delPhoto } from '../lib/photos'
 
 export default function Transactions() {
   const { state, dispatch } = useStore()
   const [key, setKey] = useState(currentMonthKey())
   const [filter, setFilter] = useState('todos') // todos | gasto | ganho
   const [editing, setEditing] = useState(null)
+  const [importing, setImporting] = useState(false)
 
   const txs = state.transactions
     .filter((t) => monthKey(t.date) === key)
@@ -19,8 +22,9 @@ export default function Transactions() {
 
   return (
     <div>
-      <div className="topbar">
-        <h1>Lançamentos</h1>
+      <div className="spread" style={{ marginBottom: 16 }}>
+        <h1 style={{ fontSize: 20, fontWeight: 800 }}>Lançamentos</h1>
+        <button className="chip" onClick={() => setImporting(true)}>⬆️ Importar CSV</button>
       </div>
 
       {/* Navegação de mês */}
@@ -52,7 +56,7 @@ export default function Transactions() {
               <div className="item" key={t.id} onClick={() => setEditing(t)}>
                 <div className="ic" style={{ background: (cat?.color || '#334') + '33' }}>{cat?.icon || '📦'}</div>
                 <div className="body">
-                  <div className="t">{t.description || cat?.name || 'Lançamento'}</div>
+                  <div className="t">{t.description || cat?.name || 'Lançamento'} {t.photoId && '📎'}</div>
                   <div className="s">{formatDate(t.date)} · {cat?.name} · {acc?.name}</div>
                 </div>
                 <div className={`amt ${t.type === 'ganho' ? 'pos' : 'neg'}`}>
@@ -71,6 +75,7 @@ export default function Transactions() {
             className="btn danger full mt"
             onClick={() => {
               if (confirm('Excluir este lançamento?')) {
+                if (editing.photoId) delPhoto(editing.photoId)
                 dispatch({ type: 'DELETE_TX', id: editing.id })
                 setEditing(null)
               }
@@ -78,6 +83,12 @@ export default function Transactions() {
           >
             🗑️ Excluir lançamento
           </button>
+        </Sheet>
+      )}
+
+      {importing && (
+        <Sheet title="Importar extrato CSV" onClose={() => setImporting(false)}>
+          <ImportCSV onClose={() => setImporting(false)} />
         </Sheet>
       )}
     </div>

@@ -3,6 +3,7 @@ import {
   useStore, totalBalance, monthSummary, expensesByCategory,
   projectedBalance, netWorth, monthlyTrend, categoryById, accountById,
 } from '../store'
+import { insights } from '../lib/insights'
 import { brl, currentMonthKey, monthLabel, monthShort, formatDateShort } from '../lib/format'
 
 export default function Dashboard() {
@@ -16,6 +17,7 @@ export default function Dashboard() {
   const nw = netWorth(state)
   const trend = monthlyTrend(state, 6)
   const recent = state.transactions.slice(0, 5)
+  const alerts = insights(state)
 
   return (
     <div>
@@ -44,6 +46,18 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Alertas inteligentes */}
+      {alerts.length > 0 && (
+        <div className="alerts">
+          {alerts.map((a, i) => (
+            <div className={`alert ${a.level}`} key={i}>
+              <span className="ai">{a.icon}</span>
+              <span>{a.text}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Sobrou / Projeção */}
       <div className="grid-2" style={{ marginTop: 12 }}>
