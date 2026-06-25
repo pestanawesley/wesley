@@ -237,6 +237,15 @@ function juroLabel(d) {
   return d.juroTipo === 'percent' ? `${d.juroPercent}%/${per}` : `${brl(d.juroValor)}/${per}`
 }
 
+// Sufixo com a taxa efetiva (%/mês e %/ano). No R$ fixo, mostra o % "escondido".
+function rateSuffix(d) {
+  if (d.semJuros) return ''
+  const eff = effRateMonthly(d)
+  if (eff <= 0) return ''
+  if (d.juroTipo === 'percent') return ` · ${annualRate(eff).toFixed(0)}%/ano`
+  return ` ≈ ${eff.toFixed(1).replace('.', ',')}%/mês · ${annualRate(eff).toFixed(0)}%/ano`
+}
+
 function DebtCard({ d, s, onPayInterest, onPay, onDelete, onDelPayment }) {
   const [open, setOpen] = useState(false)
   const pct = (s.principalPaid + s.balance) > 0 ? Math.round((s.principalPaid / (s.principalPaid + s.balance)) * 100) : 0
@@ -249,7 +258,7 @@ function DebtCard({ d, s, onPayInterest, onPay, onDelete, onDelPayment }) {
         <div>
           <div style={{ fontWeight: 700 }}>{d.credor}</div>
           <div className="muted" style={{ fontSize: 12 }}>
-            {juroLabel(d)}{!d.semJuros && d.juroTipo === 'percent' && ` · ${annualRate(effRateMonthly(d)).toFixed(0)}%/ano`}
+            {juroLabel(d)}{rateSuffix(d)}
           </div>
         </div>
         <div className="right">
