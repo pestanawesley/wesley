@@ -82,6 +82,27 @@ export const addDaysISO = (iso, days) => {
   return d.toISOString().slice(0, 10)
 }
 
+// ---------- Frequência / períodos (mensal, semanal, quinzenal) ----------
+
+// Avança uma data ISO em um período conforme a frequência.
+export const addPeriodISO = (iso, freq) => {
+  const d = new Date(iso + 'T00:00:00')
+  if (freq === 'semanal') d.setDate(d.getDate() + 7)
+  else if (freq === 'quinzenal') d.setDate(d.getDate() + 14)
+  else d.setMonth(d.getMonth() + 1)
+  return d.toISOString().slice(0, 10)
+}
+
+// Quantos períodos cabem num mês (para converter juros/valores para mensal).
+export const periodsPerMonth = (freq) =>
+  freq === 'semanal' ? 30.44 / 7 : freq === 'quinzenal' ? 30.44 / 14 : 1
+
+export const freqNoun = (freq) =>
+  ({ semanal: 'semana', quinzenal: 'quinzena', mensal: 'mês' }[freq] || 'mês')
+
+export const freqLabel = (freq) =>
+  ({ semanal: 'Semanal', quinzenal: 'Quinzenal', mensal: 'Mensal' }[freq] || 'Mensal')
+
 export const WEEKDAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
 
 // Matriz do mês: array de semanas, cada uma com 7 células {iso, day, inMonth}

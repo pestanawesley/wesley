@@ -1,74 +1,114 @@
-// Cálculos das dívidas particulares (juros compostos mensais).
-import { monthKey, currentMonthKey, shiftMonth } from './format'
+// Cálculos das dívidas particulares.
+// Modelo único: a dívida tem um principal, um juro por período (% ou R$ fixo,
+// ou SEM juros) e uma frequência (mensal/semanal/quinzenal). A cada período o
+// juro corre; quando um pagamento entra, ele cobre primeiro o juro acumulado e
+// o que sobra abate o principal. Assim, pagar só o juro mantém a dívida igual.
+import { todayISO, addPeriodISO, periodsPerMonth } from './format'
 
-// Saldo devedor atual: parte do saldo registrado (balance0 em asOf) e, a cada
-// mês seguinte, aplica os juros e subtrai os pagamentos daquele mês.
-export function currentBalance(debt, today = currentMonthKey()) {
-  let bal = Number(debt.balance0) || 0
-  const r = (Number(debt.rate) || 0) / 100
-  const startK = monthKey(debt.asOf)
+const num = (x) => (Number.isFinite(Number(x)) ? Number(x) : 0)
 
-  const payByMonth = {}
+// Processa a dívida no tempo e devolve a situação atual + divisão de cada pagamento.
+export function computeDebt(debt, today = todayISO()) {
+  const semJuros = !!debt.semJuros
+  const events = []
+
+  // Eventos de juros: um a cada período, a partir do asOf até hoje.
+  if (!semJuros) {
+    let d = debt.asOf
+    let guard = 0
+    while (guard++ < 3000) {
+      d = addPeriodISO(d, debt.frequencia)
+      if (d > today) break
+      events.push({ date: d, t: 'i' })
+    }
+  }
+  // Eventos de pagamento.
   for (const p of debt.payments || []) {
-    const mk = monthKey(p.date)
-    payByMonth[mk] = (payByMonth[mk] || 0) + (Number(p.amount) || 0)
+    events.push({ date: p.date, t: 'p', amount: num(p.amount), id: p.id, kind: p.kind })
+  }
+  // Ordena por data; no mesmo dia, o juro vem antes do pagamento.
+  events.sort((a, b) => (a.date === b.date ? (a.t === 'i' ? -1 : 1) : a.date.localeCompare(b.date)))
+
+  let principal = num(debt.principal)
+  let unpaid = 0 // juro acumulado ainda não pago
+  let interestPaid = 0
+  let principalPaid = 0
+  const alloc = {} // divisão de cada pagamento: { [id]: {interest, principal} }
+
+  const periodInterest = (base) =>
+    debt.juroTipo === 'percent' ? base * (num(debt.juroPercent) / 100) : base > 0 ? num(debt.juroValor) : 0
+
+  for (const e of events) {
+    if (e.t === 'i') {
+      unpaid += periodInterest(principal + unpaid)
+    } else if (e.kind === 'juros') {
+      // Pagamento explícito de juros: nunca abate o principal.
+      unpaid = Math.max(0, unpaid - e.amount)
+      interestPaid += e.amount
+      alloc[e.id] = { interest: e.amount, principal: 0 }
+    } else {
+      // Pagamento normal: cobre o juro acumulado, o resto abate o principal.
+      let amt = e.amount
+      const ti = Math.min(amt, unpaid); unpaid -= ti; interestPaid += ti; amt -= ti
+      const tp = Math.min(amt, principal); principal -= tp; principalPaid += tp
+      alloc[e.id] = { interest: ti, principal: tp }
+    }
   }
 
-  let k = startK
-  let guard = 0
-  while (k <= today && guard++ < 1200) {
-    if (k !== startK) bal += bal * r // juros a partir do mês seguinte
-    bal -= payByMonth[k] || 0
-    if (bal < 0) bal = 0
-    k = shiftMonth(k, 1)
-  }
-  return bal
+  const balance = principal + unpaid
+  const perPeriodInterest = semJuros ? 0 : periodInterest(balance)
+  const monthlyInterest = perPeriodInterest * periodsPerMonth(debt.frequencia)
+  return { balance, interestPaid, principalPaid, perPeriodInterest, monthlyInterest, alloc, semJuros }
 }
 
-export function totalPaid(debt) {
-  return (debt.payments || []).reduce((s, p) => s + (Number(p.amount) || 0), 0)
+export const currentBalance = (debt, today) => computeDebt(debt, today).balance
+export const totalInterestPaid = (debt) => computeDebt(debt).interestPaid
+export const monthlyInterest = (debt) => computeDebt(debt).monthlyInterest
+export const perPeriodInterest = (debt) => computeDebt(debt).perPeriodInterest
+export const totalPaid = (debt) => (debt.payments || []).reduce((s, p) => s + num(p.amount), 0)
+
+// Taxa mensal efetiva (para priorizar). Sem juros -> 0.
+export function effRateMonthly(debt) {
+  const s = computeDebt(debt)
+  if (s.semJuros || s.balance <= 0) return 0
+  return (s.monthlyInterest / s.balance) * 100
 }
 
-// Juros do mês corrente sobre o saldo atual (quanto a dívida "engorda" por mês).
-export function monthlyInterest(debt) {
-  return currentBalance(debt) * ((Number(debt.rate) || 0) / 100)
-}
-
-// Taxa efetiva anual a partir da mensal: (1+i)^12 - 1.
 export function annualRate(monthlyPct) {
-  const r = (Number(monthlyPct) || 0) / 100
-  return (Math.pow(1 + r, 12) - 1) * 100
+  return (Math.pow(1 + num(monthlyPct) / 100, 12) - 1) * 100
 }
 
-// Simula quitar TODAS as dívidas pagando `budget` por mês, priorizando a de
-// maior juro (método avalanche). Retorna meses, juros totais e total pago.
+// Simulador de quitação (mensal, avalanche pelo maior juro). Estimativa.
 export function simulatePayoff(debts, budget) {
   const items = debts
-    .map((d) => ({ rate: (Number(d.rate) || 0) / 100, b: currentBalance(d) }))
-    .filter((x) => x.b > 0.01)
+    .map((d) => {
+      const s = computeDebt(d)
+      const fixed = !s.semJuros && d.juroTipo !== 'percent'
+      return { bal: s.balance, mInt: s.monthlyInterest, fixed, semJuros: s.semJuros }
+    })
+    .filter((x) => x.bal > 0.01)
 
   if (!items.length) return { months: 0, interest: 0, totalPaid: 0, done: true }
 
-  const interest0 = items.reduce((s, x) => s + x.b * x.rate, 0)
-  if (budget <= interest0) return { impossible: true, minNeeded: interest0 }
+  const monthInt = (x) => (x.semJuros ? 0 : x.fixed ? (x.bal > 0 ? x.mInt : 0) : x.bal * (x.mInt / (x.bal || 1)))
+  const rateOf = (x) => (x.bal > 0 ? monthInt(x) / x.bal : 0)
 
-  let months = 0
-  let interest = 0
-  let paid = 0
-  while (items.some((x) => x.b > 0.01) && months < 1200) {
-    items.forEach((x) => {
-      const i = x.b * x.rate
-      x.b += i
-      interest += i
-    })
+  const interest0 = items.reduce((s, x) => s + monthInt(x), 0)
+  if (budget <= interest0 && interest0 > 0) return { impossible: true, minNeeded: interest0 }
+
+  let months = 0, interest = 0, paid = 0
+  while (items.some((x) => x.bal > 0.01) && months < 1200) {
     let left = budget
-    items.sort((a, b) => b.rate - a.rate)
     for (const x of items) {
+      const i = monthInt(x)
+      interest += i
+      x.bal += i // capitaliza; será reduzido pelos pagamentos abaixo
+    }
+    const order = [...items].sort((a, b) => rateOf(b) - rateOf(a))
+    for (const x of order) {
       if (left <= 0) break
-      const pay = Math.min(left, x.b)
-      x.b -= pay
-      left -= pay
-      paid += pay
+      const pay = Math.min(left, x.bal)
+      x.bal -= pay; left -= pay; paid += pay
     }
     months++
   }
