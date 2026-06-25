@@ -111,14 +111,14 @@ function VaultHome({ data, update, onClose }) {
 
   const addDebt = (d) => update({ ...data, debts: [...debts, { ...d, id: uid(), payments: [] }] })
   const delDebt = (id) => update({ ...data, debts: debts.filter((d) => d.id !== id) })
-  const addPayment = (debtId, amount, date, kind) =>
+  const addPayment = (debtId, { amount, juros, date }) =>
     update({
       ...data,
       debts: debts.map((d) =>
         d.id === debtId
           ? {
               ...d,
-              payments: [...(d.payments || []), { id: uid(), amount, date, kind }],
+              payments: [...(d.payments || []), { id: uid(), amount, juros, date }],
               proximoVencimento: d.proximoVencimento ? addPeriodISO(d.proximoVencimento, d.frequencia) : d.proximoVencimento,
             }
           : d,
@@ -194,8 +194,8 @@ function VaultHome({ data, update, onClose }) {
           calc.map(({ d, s }) => (
             <DebtCard
               key={d.id} d={d} s={s}
-              onPayInterest={() => setPaying({ debt: d, prefill: perPeriodInterest(d), kind: 'juros' })}
-              onPay={() => setPaying({ debt: d, prefill: '', kind: 'normal' })}
+              onPayInterest={() => setPaying({ debt: d, mode: 'juros' })}
+              onPay={() => setPaying({ debt: d, mode: 'normal' })}
               onDelete={() => confirm2('Excluir esta dívida?') && delDebt(d.id)}
             />
           ))
@@ -205,9 +205,9 @@ function VaultHome({ data, update, onClose }) {
       {adding && <DebtForm onClose={() => setAdding(false)} onSave={(d) => { addDebt(d); setAdding(false) }} />}
       {paying && (
         <PaymentForm
-          debt={paying.debt} prefill={paying.prefill}
+          debt={paying.debt} mode={paying.mode}
           onClose={() => setPaying(null)}
-          onSave={(amount, date) => { addPayment(paying.debt.id, amount, date, paying.kind); setPaying(null) }}
+          onSave={(pay) => { addPayment(paying.debt.id, pay); setPaying(null) }}
         />
       )}
     </div>
@@ -393,29 +393,46 @@ function DebtForm({ onClose, onSave }) {
   )
 }
 
-function PaymentForm({ debt, prefill, onClose, onSave }) {
-  const [amount, setAmount] = useState(prefill ? String(prefill.toFixed(2)).replace('.', ',') : '')
+function PaymentForm({ debt, mode, onClose, onSave }) {
+  const fmt = (n) => (n ? String(Number(n).toFixed(2)).replace('.', ',') : '')
+  const periodJuros = perPeriodInterest(debt)
+  const [juros, setJuros] = useState(debt.semJuros ? '0' : fmt(periodJuros))
+  const [amount, setAmount] = useState(mode === 'juros' ? fmt(periodJuros) : '')
   const [date, setDate] = useState(todayISO())
+
+  const jurosN = debt.semJuros ? 0 : parseNum(juros)
+  const abate = Math.max(0, parseNum(amount) - jurosN)
+
   const submit = (e) => {
     e.preventDefault()
     const a = parseNum(amount)
     if (!(a > 0)) return alert('Informe o valor pago.')
-    onSave(a, date)
+    if (jurosN > a) return alert('O juros não pode ser maior que o valor pago.')
+    onSave({ amount: a, juros: jurosN, date })
   }
+
   return (
-    <Overlay title={`Pagamento · ${debt.credor}`} onClose={onClose}>
+    <Overlay title={`${mode === 'juros' ? 'Pagar juros' : 'Pagamento'} · ${debt.credor}`} onClose={onClose}>
       <form onSubmit={submit}>
         <div className="field">
+          <label>Valor total pago</label>
           <input className="amount-input" inputMode="decimal" placeholder="R$ 0,00" value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus />
         </div>
-        <p className="muted" style={{ fontSize: 12, marginBottom: 12 }}>
-          O app divide sozinho: primeiro cobre o juro do período, o resto abate a dívida.
-        </p>
+        {!debt.semJuros && (
+          <div className="field">
+            <label>Quanto desse valor é juros?</label>
+            <input inputMode="decimal" placeholder="0,00" value={juros} onChange={(e) => setJuros(e.target.value)} />
+          </div>
+        )}
+        <div className="card" style={{ fontSize: 13, marginBottom: 14 }}>
+          <div className="spread"><span className="muted">Juros (não abate)</span><span>{brl(jurosN)}</span></div>
+          <div className="spread mt"><span className="muted">Abate da dívida</span><span className="pos">{brl(abate)}</span></div>
+        </div>
         <div className="field">
           <label>Data</label>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
-        <button type="submit" className="btn primary full">Registrar pagamento</button>
+        <button type="submit" className="btn primary full">Registrar</button>
       </form>
     </Overlay>
   )
