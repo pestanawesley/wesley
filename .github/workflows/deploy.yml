@@ -3,7 +3,6 @@ name: Deploy app to GitHub Pages
 on:
   push:
     branches:
-      - claude/personal-wallet-finance-1ka4pr
       - main
   workflow_dispatch:
 
