@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useStore } from '../store'
+import { useStore, emergencyTarget } from '../store'
 import { brl, formatDate } from '../lib/format'
 import Sheet from '../components/Sheet'
 
@@ -8,12 +8,30 @@ export default function Goals() {
   const [adding, setAdding] = useState(false)
   const [contrib, setContrib] = useState(null)
 
+  const hasReserva = state.goals.some((g) => /reserva|emerg/i.test(g.name))
+  const reservaTarget = emergencyTarget(state, 3)
+
+  const criarReserva = () => {
+    dispatch({ type: 'ADD_GOAL', payload: { name: 'Reserva de emergência', target: Math.round(reservaTarget), deadline: null, icon: '🛟' } })
+  }
+
   return (
     <div>
       <div className="topbar"><h1>Metas & Objetivos</h1></div>
       <p className="muted" style={{ fontSize: 13, margin: '0 4px 14px' }}>
         Defina objetivos (reserva de emergência, viagem, carro) e acompanhe o quanto já guardou.
       </p>
+
+      {!hasReserva && reservaTarget > 0 && (
+        <div className="card" style={{ marginBottom: 12, borderColor: 'rgba(91,140,255,.4)' }}>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>🛟 Comece pela reserva de emergência</div>
+          <p className="muted" style={{ fontSize: 13, lineHeight: 1.4 }}>
+            O ideal é juntar uns <b>3 meses</b> dos seus compromissos fixos — daria <b>{brl(Math.round(reservaTarget))}</b>.
+            É ela que faz você nunca mais precisar de agiota.
+          </p>
+          <button className="btn primary full mt" onClick={criarReserva}>Criar meta da reserva</button>
+        </div>
+      )}
 
       <button className="btn primary full" onClick={() => setAdding(true)}>+ Nova meta</button>
 

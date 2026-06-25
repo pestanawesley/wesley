@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useReducer } from 'react'
 import * as db from './lib/db'
 import { seed } from './lib/seed'
-import { uid, currentMonthKey, monthKey, todayISO, isoForDay, addDaysISO, shiftMonth, addMonthsISO, monthsDiffKeys } from './lib/format'
+import { uid, currentMonthKey, monthKey, todayISO, isoForDay, addDaysISO, shiftMonth, addMonthsISO, monthsDiffKeys, daysUntil } from './lib/format'
 
 // Datas em que uma recorrência mensal "acontece", do início até o horizonte.
 function recurrenceOccurrences(rec, horizonISO) {
@@ -430,6 +430,50 @@ export function projectedBalance(state, key = currentMonthKey()) {
   const toReceive = pend.filter((b) => b.type === 'receber').reduce((s, b) => s + b.amount, 0)
   const toPay = pend.filter((b) => b.type === 'pagar').reduce((s, b) => s + b.amount, 0) + installmentsToPay(state, key)
   return { projected: base + toReceive - toPay, toReceive, toPay, base }
+}
+
+// Plano do mês: renda fixa (recorrentes ganho) vs compromissos fixos
+// (recorrentes gasto + parcelas), e a sobra prevista para guardar.
+export function monthlyPlan(state) {
+  const rec = state.recurrences || []
+  const income = rec.filter((r) => r.type === 'ganho' && r.active !== false).reduce((s, r) => s + (r.amount || 0), 0)
+  const recOut = rec.filter((r) => r.type === 'gasto' && r.active !== false).reduce((s, r) => s + (r.amount || 0), 0)
+  const instOut = activeInstallments(state).reduce((s, i) => s + (i.installmentValue || 0), 0)
+  const fixedOut = recOut + instOut
+  return { income, recOut, instOut, fixedOut, leftover: income - fixedOut }
+}
+
+// Linha do tempo: quando cada parcelado acaba e quanto libera por mês.
+export function payoffTimeline(state) {
+  return activeInstallments(state)
+    .map((i) => ({
+      id: i.id,
+      description: i.description,
+      end: addMonthsISO(i.firstDate, i.totalInstallments - 1),
+      freed: i.installmentValue,
+      restantes: installmentStatus(i).restantes,
+    }))
+    .sort((a, b) => a.end.localeCompare(b.end))
+}
+
+// Vencimentos nos próximos N dias (contas futuras + parcelas).
+export function upcomingDues(state, days = 7) {
+  const list = []
+  for (const b of openBills(state)) {
+    const d = daysUntil(b.dueDate)
+    if (d <= days) list.push({ desc: b.description, date: b.dueDate, amount: b.amount, kind: b.type, days: d })
+  }
+  for (const i of activeInstallments(state)) {
+    const st = installmentStatus(i)
+    const d = daysUntil(st.nextDue)
+    if (d <= days) list.push({ desc: i.description, date: st.nextDue, amount: i.installmentValue, kind: 'pagar', days: d })
+  }
+  return list.sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+}
+
+// Sugestão de reserva de emergência = N meses dos compromissos fixos.
+export function emergencyTarget(state, months = 3) {
+  return monthlyPlan(state).fixedOut * months
 }
 
 // Patrimônio líquido = saldo das contas + guardado em metas - dívidas em aberto (a pagar)

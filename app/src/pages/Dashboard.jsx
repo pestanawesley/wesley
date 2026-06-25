@@ -1,11 +1,12 @@
-import { useRef } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, Tooltip } from 'recharts'
 import {
   useStore, totalBalance, monthSummary, expensesByCategory,
   projectedBalance, netWorth, monthlyTrend, categoryById, accountById,
+  monthlyPlan, payoffTimeline, upcomingDues,
 } from '../store'
 import { insights } from '../lib/insights'
-import { brl, currentMonthKey, monthLabel, monthShort, formatDateShort } from '../lib/format'
+import { brl, currentMonthKey, monthKey, monthLabel, monthShort, formatDateShort } from '../lib/format'
 
 export default function Dashboard({ onSecret }) {
   const { state } = useStore()
@@ -30,6 +31,32 @@ export default function Dashboard({ onSecret }) {
   const trend = monthlyTrend(state, 6)
   const recent = state.transactions.filter((t) => t.type !== 'transferencia').slice(0, 5)
   const alerts = insights(state)
+  const plan = monthlyPlan(state)
+  const timeline = payoffTimeline(state)
+  const dues = upcomingDues(state, 7)
+
+  // Lembrete: ao abrir, avisa contas vencendo hoje/atrasadas (se você permitiu).
+  const [notifAsked, setNotifAsked] = useState(
+    typeof Notification !== 'undefined' ? Notification.permission : 'unsupported',
+  )
+  useEffect(() => {
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+    const venc = dues.filter((d) => d.days <= 0 && d.kind === 'pagar')
+    if (venc.length) {
+      try {
+        new Notification('Minha Carteira', {
+          body: `${venc.length} conta(s) vencendo hoje ou atrasada(s).`,
+          icon: `${import.meta.env.BASE_URL}icon-192.png`,
+        })
+      } catch { /* ignora */ }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const ativarAvisos = () => {
+    if (typeof Notification === 'undefined') return
+    Notification.requestPermission().then(setNotifAsked)
+  }
 
   return (
     <div>
@@ -76,6 +103,31 @@ export default function Dashboard({ onSecret }) {
           </div>
         )}
 
+        {/* A vencer (próximos 7 dias) */}
+        {dues.length > 0 && (
+          <div className="block">
+            <div className="card" style={{ borderColor: 'rgba(245,158,11,.4)' }}>
+              <div className="spread" style={{ marginBottom: 8 }}>
+                <b>🔔 A vencer (7 dias)</b>
+                <b className="neg">{brl(dues.filter((d) => d.kind === 'pagar').reduce((s, d) => s + d.amount, 0))}</b>
+              </div>
+              {notifAsked === 'default' && (
+                <button className="chip" style={{ marginBottom: 8 }} onClick={ativarAvisos}>🔔 Ativar avisos no navegador</button>
+              )}
+              {dues.slice(0, 4).map((d, i) => (
+                <div className="spread" key={i} style={{ fontSize: 13, padding: '3px 0' }}>
+                  <span>
+                    {d.days < 0 ? <span className="badge late">atrasada</span> : d.days === 0 ? <span className="badge soon">hoje</span> : <span className="badge ok">{d.days}d</span>}
+                    {' '}{d.desc}
+                  </span>
+                  <span className={d.kind === 'receber' ? 'pos' : 'neg'}>{brl(d.amount)}</span>
+                </div>
+              ))}
+              {dues.length > 4 && <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>+{dues.length - 4} mais…</div>}
+            </div>
+          </div>
+        )}
+
         {/* Sobrou / Projeção */}
         <div className="block">
           <div className="grid-2">
@@ -101,6 +153,30 @@ export default function Dashboard({ onSecret }) {
             </div>
           )}
         </div>
+
+        {/* Plano do mês: sobra pra guardar */}
+        {(plan.income > 0 || plan.fixedOut > 0) && (
+          <div className="block">
+            <div className="section-title">Plano do mês</div>
+            <div className="card">
+              <div className="spread" style={{ fontSize: 13 }}>
+                <span className="muted">Renda fixa</span><span className="pos">{brl(plan.income)}</span>
+              </div>
+              <div className="spread mt" style={{ fontSize: 13 }}>
+                <span className="muted">Compromissos fixos (contas + parcelas)</span><span className="neg">{brl(plan.fixedOut)}</span>
+              </div>
+              <div className="spread mt" style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+                <b>Sobra pra guardar</b>
+                <b className={plan.leftover >= 0 ? 'pos' : 'neg'} style={{ fontSize: 18 }}>{brl(plan.leftover)}</b>
+              </div>
+              {plan.leftover > 0 && (
+                <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+                  💡 Dá pra separar até <b>{brl(plan.leftover)}</b> esse mês. Que tal mandar pra uma meta?
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Patrimônio */}
         <div className="block">
@@ -171,6 +247,22 @@ export default function Dashboard({ onSecret }) {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Quando você se livra (parcelados terminando) */}
+        {timeline.length > 0 && (
+          <div className="block">
+            <div className="section-title">🏁 Quando você se livra</div>
+            <div className="card">
+              {timeline.map((t) => (
+                <div className="spread" key={t.id} style={{ fontSize: 13, padding: '5px 0' }}>
+                  <span>{monthLabel(monthKey(t.end))} <span className="muted">· {t.description}</span></span>
+                  <span className="pos">+{brl(t.freed)}/mês</span>
+                </div>
+              ))}
+              <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>Quando cada um acaba, esse valor volta a sobrar todo mês.</div>
             </div>
           </div>
         )}
