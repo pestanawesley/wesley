@@ -27,7 +27,7 @@ export default function Goals() {
           <div style={{ fontWeight: 700, marginBottom: 4 }}>🛟 Comece pela reserva de emergência</div>
           <p className="muted" style={{ fontSize: 13, lineHeight: 1.4 }}>
             O ideal é juntar uns <b>3 meses</b> dos seus compromissos fixos — daria <b>{brl(Math.round(reservaTarget))}</b>.
-            É ela que faz você nunca mais precisar de agiota.
+            É ela que te protege de imprevistos e de dívidas caras.
           </p>
           <button className="btn primary full mt" onClick={criarReserva}>Criar meta da reserva</button>
         </div>
