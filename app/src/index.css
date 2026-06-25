@@ -79,7 +79,7 @@ label {
   max-width: 720px;
   margin: 0 auto;
   min-height: 100%;
-  padding: 18px 16px 110px;
+  padding: 18px 16px 150px;
 }
 
 .topbar {
@@ -726,14 +726,38 @@ label {
 }
 
 /* ---------- Dashboard em blocos ---------- */
-/* Celular: blocos empilhados com espaçamento uniforme. */
+/* Celular estreito: blocos empilhados. */
 .dash-grid {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 .dash-grid .section-title {
-  margin: 0 4px 10px;
+  margin: 0 4px 8px;
+}
+/* Blocos mais compactos (menos altos). */
+.dash-grid .hero-balance {
+  padding: 16px;
+}
+.dash-grid .hero-balance .val {
+  font-size: 26px;
+}
+.dash-grid .card {
+  padding: 13px;
+}
+
+/* A partir de ~560px já fica lado a lado (2 colunas). */
+@media (min-width: 560px) {
+  .dash-grid {
+    display: block;
+    column-count: 2;
+    column-gap: 12px;
+  }
+  .dash-grid .block {
+    break-inside: avoid;
+    margin: 0 0 12px;
+    display: block;
+  }
 }
 
 /* ====================================================================
@@ -742,19 +766,7 @@ label {
 @media (min-width: 760px) {
   .app {
     max-width: 940px;
-    padding: 16px 20px 84px;
-  }
-
-  /* Dashboard vira 2 colunas (cada bloco fica inteiro, sem quebrar). */
-  .dash-grid {
-    display: block;
-    column-count: 2;
-    column-gap: 16px;
-  }
-  .dash-grid .block {
-    break-inside: avoid;
-    margin: 0 0 16px;
-    display: block;
+    padding: 16px 20px 120px;
   }
 
   /* Tudo um pouco menor para caber sem rolagem. */

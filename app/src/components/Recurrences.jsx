@@ -52,7 +52,7 @@ export default function Recurrences() {
   )
 }
 
-function RecForm({ onClose, editing }) {
+export function RecForm({ onClose, editing }) {
   const { state, dispatch } = useStore()
   const fmt = (n) => (n ? String(Number(n)).replace('.', ',') : '')
   const [type, setType] = useState(editing?.type || 'gasto')

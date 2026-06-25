@@ -9,6 +9,7 @@ import Vault from './pages/Vault'
 import Sheet from './components/Sheet'
 import TransactionForm from './components/TransactionForm'
 import TransferForm from './components/TransferForm'
+import { RecForm } from './components/Recurrences'
 
 const TABS = [
   { id: 'home', label: 'Início', icon: '🏠' },
@@ -23,6 +24,7 @@ const QUICK = [
   { id: 'tx', icon: '💸', label: 'Gasto ou ganho' },
   { id: 'bill', icon: '📅', label: 'Conta futura' },
   { id: 'inst', icon: '🧩', label: 'Parcelado' },
+  { id: 'rec', icon: '🔁', label: 'Recorrente' },
   { id: 'transfer', icon: '🔄', label: 'Transferência' },
 ]
 
@@ -78,6 +80,11 @@ function Shell() {
       )}
       {quick === 'bill' && <BillForm onClose={close} />}
       {quick === 'inst' && <InstallmentForm onClose={close} />}
+      {quick === 'rec' && (
+        <Sheet title="Novo recorrente" onClose={close}>
+          <RecForm onClose={close} />
+        </Sheet>
+      )}
       {quick === 'transfer' && (
         <Sheet title="Transferir entre contas" onClose={close}>
           <TransferForm onDone={close} />
