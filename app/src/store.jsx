@@ -129,6 +129,22 @@ function reducer(state, action) {
     case 'DELETE_INSTALLMENT':
       return { ...state, installments: (state.installments || []).filter((i) => i.id !== action.id) }
 
+    // Salário mínimo: atualiza o valor e recalcula itens vinculados (ex.: pensão).
+    case 'SET_MINWAGE': {
+      const mw = action.value
+      const r2 = (n) => Math.round(n * 100) / 100
+      return {
+        ...state,
+        settings: { ...state.settings, minWage: mw },
+        recurrences: state.recurrences.map((r) =>
+          r.linkMinWage ? { ...r, amount: r2(mw * (r.minWageFraction || 0)) } : r,
+        ),
+        installments: (state.installments || []).map((i) =>
+          i.linkMinWage ? { ...i, installmentValue: r2(mw * (i.minWageFraction || 0)) } : i,
+        ),
+      }
+    }
+
     // Gera lançamentos/contas das recorrências ativas (idempotente).
     case 'MATERIALIZE': {
       const horizon = addDaysISO(todayISO(), 45)

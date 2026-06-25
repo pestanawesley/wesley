@@ -17,6 +17,7 @@ const empty = () => ({
   recurrences: [], // lançamentos recorrentes (salário, aluguel, assinaturas)
   installments: [], // parcelados (pensão, financiamento, compras parceladas)
   goals: [], // metas / objetivos
+  settings: { minWage: 0 }, // salário mínimo (para itens vinculados, ex.: pensão)
   meta: { createdAt: new Date().toISOString() },
 })
 

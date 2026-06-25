@@ -102,6 +102,9 @@ export default function Accounts() {
         })}
       </div>
 
+      <div className="section-title">Salário mínimo</div>
+      <MinWageSetting />
+
       <div className="section-title">Seus dados</div>
       <div className="card">
         <p className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
@@ -128,6 +131,36 @@ export default function Accounts() {
           <Invoice card={invoiceCard} onClose={() => setInvoiceCard(null)} />
         </Sheet>
       )}
+    </div>
+  )
+}
+
+function MinWageSetting() {
+  const { state, dispatch } = useStore()
+  const cur = state.settings?.minWage || 0
+  const [val, setVal] = useState(cur ? String(cur).replace('.', ',') : '')
+  const linked = (state.installments || []).filter((i) => i.linkMinWage).length
+    + (state.recurrences || []).filter((r) => r.linkMinWage).length
+
+  const save = () => {
+    const n = parseFloat(String(val).replace(/\./g, '').replace(',', '.'))
+    if (!(n > 0)) return alert('Informe um valor válido.')
+    dispatch({ type: 'SET_MINWAGE', value: n })
+    alert(linked ? `Atualizado! ${linked} item(ns) vinculado(s) foram recalculados.` : 'Salário mínimo salvo.')
+  }
+
+  return (
+    <div className="card">
+      <p className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
+        Usado por itens vinculados (ex.: pensão = ½ do mínimo). No reajuste anual, atualize aqui e tudo recalcula.
+      </p>
+      <div className="field-row" style={{ alignItems: 'flex-end' }}>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Valor atual</label>
+          <input inputMode="decimal" placeholder="0,00" value={val} onChange={(e) => setVal(e.target.value)} />
+        </div>
+        <button className="btn primary" style={{ flex: 'none' }} onClick={save}>Salvar</button>
+      </div>
     </div>
   )
 }

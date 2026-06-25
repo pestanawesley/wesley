@@ -6,19 +6,20 @@ import { brl, todayISO } from '../lib/format'
 export default function Recurrences() {
   const { state, dispatch } = useStore()
   const [adding, setAdding] = useState(false)
+  const [editing, setEditing] = useState(null)
 
   return (
     <div>
       <p className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
         Cadastre o que se repete todo mês (salário, aluguel, assinaturas). O app gera
-        as contas/lançamentos automaticamente nas datas certas.
+        as contas/lançamentos automaticamente nas datas certas. Toque pra editar.
       </p>
 
-      {!adding && (
+      {!adding && !editing && (
         <button className="btn primary full" onClick={() => setAdding(true)}>+ Novo recorrente</button>
       )}
 
-      {adding && <RecForm onClose={() => setAdding(false)} />}
+      {(adding || editing) && <RecForm editing={editing} onClose={() => { setAdding(false); setEditing(null) }} />}
 
       <div className="list" style={{ marginTop: 14 }}>
         {state.recurrences.length === 0 ? (
@@ -27,12 +28,12 @@ export default function Recurrences() {
           state.recurrences.map((r) => {
             const cat = categoryById(state, r.categoryId)
             return (
-              <div className="item" key={r.id}>
+              <div className="item" key={r.id} style={{ cursor: 'pointer' }} onClick={() => setEditing(r)}>
                 <div className="ic" style={{ background: (r.type === 'ganho' ? '#22c55e' : '#ef4444') + '22' }}>
                   {r.type === 'ganho' ? '📥' : '📤'}
                 </div>
                 <div className="body">
-                  <div className="t">{r.description}</div>
+                  <div className="t">{r.description} {r.linkMinWage && <span className="badge ok">💡 mín.</span>}</div>
                   <div className="s">
                     Todo dia {r.dayOfMonth} · {cat?.name || 'Sem categoria'}
                     {r.autoConfirm ? ' · auto' : ' · confirmar'}
@@ -40,7 +41,7 @@ export default function Recurrences() {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div className={`amt ${r.type === 'ganho' ? 'pos' : 'neg'}`}>{brl(r.amount)}</div>
-                  <button className="del" onClick={() => confirm('Excluir recorrente? (não apaga o que já foi gerado)') && dispatch({ type: 'DELETE_RECURRENCE', id: r.id })}>🗑️</button>
+                  <button className="del" onClick={(e) => { e.stopPropagation(); confirm('Excluir recorrente? (não apaga o que já foi gerado)') && dispatch({ type: 'DELETE_RECURRENCE', id: r.id }) }}>🗑️</button>
                 </div>
               </div>
             )
@@ -51,15 +52,16 @@ export default function Recurrences() {
   )
 }
 
-function RecForm({ onClose }) {
+function RecForm({ onClose, editing }) {
   const { state, dispatch } = useStore()
-  const [type, setType] = useState('gasto')
-  const [description, setDescription] = useState('')
-  const [amount, setAmount] = useState('')
-  const [dayOfMonth, setDayOfMonth] = useState('5')
-  const [categoryId, setCategoryId] = useState('')
-  const [accountId, setAccountId] = useState(state.accounts[0]?.id || '')
-  const [autoConfirm, setAutoConfirm] = useState(false)
+  const fmt = (n) => (n ? String(Number(n)).replace('.', ',') : '')
+  const [type, setType] = useState(editing?.type || 'gasto')
+  const [description, setDescription] = useState(editing?.description || '')
+  const [amount, setAmount] = useState(editing ? fmt(editing.amount) : '')
+  const [dayOfMonth, setDayOfMonth] = useState(editing ? String(editing.dayOfMonth) : '5')
+  const [categoryId, setCategoryId] = useState(editing?.categoryId || '')
+  const [accountId, setAccountId] = useState(editing?.accountId || state.accounts[0]?.id || '')
+  const [autoConfirm, setAutoConfirm] = useState(editing?.autoConfirm ?? false)
 
   const cats = state.categories.filter((c) => c.type === type)
 
@@ -69,14 +71,18 @@ function RecForm({ onClose }) {
     const day = Math.min(31, Math.max(1, parseInt(dayOfMonth, 10) || 1))
     if (!description.trim()) return alert('Dê um nome.')
     if (!(value > 0)) return alert('Informe o valor.')
-    dispatch({
-      type: 'ADD_RECURRENCE',
-      payload: {
-        type, description: description.trim(), amount: value, dayOfMonth: day,
-        categoryId, accountId, startDate: todayISO(), active: true, autoConfirm,
-      },
-    })
-    // Gera imediatamente as ocorrências do recorrente recém-criado.
+    if (editing) {
+      dispatch({ type: 'UPDATE_RECURRENCE', payload: { id: editing.id, type, description: description.trim(), amount: value, dayOfMonth: day, categoryId, accountId, autoConfirm } })
+    } else {
+      dispatch({
+        type: 'ADD_RECURRENCE',
+        payload: {
+          type, description: description.trim(), amount: value, dayOfMonth: day,
+          categoryId, accountId, startDate: todayISO(), active: true, autoConfirm,
+        },
+      })
+    }
+    // Gera imediatamente as ocorrências pendentes.
     setTimeout(() => dispatch({ type: 'MATERIALIZE' }), 0)
     onClose()
   }
@@ -125,7 +131,7 @@ function RecForm({ onClose }) {
       </label>
       <div className="field-row">
         <button type="button" className="btn" onClick={onClose}>Cancelar</button>
-        <button type="submit" className="btn primary">Salvar</button>
+        <button type="submit" className="btn primary">{editing ? 'Salvar alterações' : 'Salvar'}</button>
       </div>
     </form>
   )

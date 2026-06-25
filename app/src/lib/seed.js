@@ -36,6 +36,7 @@ export function seed() {
     recurrences: [],
     installments: [],
     goals: [],
+    settings: { minWage: 0 },
     meta: { createdAt: new Date().toISOString(), seeded: true },
   }
 }

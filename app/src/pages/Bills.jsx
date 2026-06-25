@@ -9,6 +9,7 @@ export default function Bills() {
   const { state, dispatch } = useStore()
   const [adding, setAdding] = useState(false)
   const [addingInst, setAddingInst] = useState(false)
+  const [editingInst, setEditingInst] = useState(null)
   const [view, setView] = useState('lista') // lista | calendario
   const [showRec, setShowRec] = useState(false)
 
@@ -97,6 +98,7 @@ export default function Bills() {
           activeInstallments(state).map((inst) => (
             <InstallmentCard
               key={inst.id} inst={inst}
+              onEdit={() => setEditingInst(inst)}
               onDelete={() => confirm('Excluir este parcelado?') && dispatch({ type: 'DELETE_INSTALLMENT', id: inst.id })}
             />
           ))
@@ -106,12 +108,14 @@ export default function Bills() {
       )}
 
       {adding && <BillForm onClose={() => setAdding(false)} />}
-      {addingInst && <InstallmentForm onClose={() => setAddingInst(false)} />}
+      {(addingInst || editingInst) && (
+        <InstallmentForm editing={editingInst} onClose={() => { setAddingInst(false); setEditingInst(null) }} />
+      )}
     </div>
   )
 }
 
-function InstallmentCard({ inst, onDelete }) {
+function InstallmentCard({ inst, onEdit, onDelete }) {
   const { state } = useStore()
   const st = installmentStatus(inst)
   const cat = categoryById(state, inst.categoryId)
@@ -119,10 +123,13 @@ function InstallmentCard({ inst, onDelete }) {
   const pct = Math.round((st.pagas / st.total) * 100)
   const d = daysUntil(st.nextDue)
   return (
-    <div className="card" style={{ marginBottom: 0 }}>
+    <div className="card" style={{ marginBottom: 0, cursor: 'pointer' }} onClick={onEdit}>
       <div className="spread">
         <div>
-          <div style={{ fontWeight: 700 }}>{inst.description} {inst.target === 'cartao' && <span className="badge ok">💳</span>}</div>
+          <div style={{ fontWeight: 700 }}>
+            {inst.description} {inst.target === 'cartao' && <span className="badge ok">💳</span>}
+            {inst.linkMinWage && <span className="badge ok">💡 mín.</span>}
+          </div>
           <div className="muted" style={{ fontSize: 12 }}>{cat?.name || 'Sem categoria'}{where ? ` · ${where}` : ''}</div>
         </div>
         <div className="right">
@@ -140,63 +147,112 @@ function InstallmentCard({ inst, onDelete }) {
           Próxima: {formatDate(st.nextDue)}{' '}
           {d < 0 ? <span className="badge late">atrasada</span> : d <= 5 ? <span className="badge soon">em {d}d</span> : <span className="badge ok">em {d}d</span>}
         </span>
-        <button className="del" style={{ fontSize: 12 }} onClick={onDelete}>🗑️</button>
+        <button className="del" style={{ fontSize: 12 }} onClick={(e) => { e.stopPropagation(); onDelete() }}>🗑️</button>
       </div>
     </div>
   )
 }
 
-export function InstallmentForm({ onClose }) {
+export function InstallmentForm({ onClose, editing }) {
   const { state, dispatch } = useStore()
   const cards = state.accounts.filter((a) => a.type === 'cartao')
   const nonCards = state.accounts.filter((a) => a.type !== 'cartao')
-  const [description, setDescription] = useState('')
-  const [installmentValue, setInstallmentValue] = useState('')
-  const [totalInstallments, setTotalInstallments] = useState('')
-  const [firstDate, setFirstDate] = useState(todayISO())
-  const [categoryId, setCategoryId] = useState('')
-  const [target, setTarget] = useState(cards.length ? 'cartao' : 'conta')
-  const [cardId, setCardId] = useState(cards[0]?.id || '')
-  const [accountId, setAccountId] = useState(nonCards[0]?.id || '')
-
   const parse = (s) => { const n = parseFloat(String(s).replace(/\./g, '').replace(',', '.')); return Number.isFinite(n) ? n : 0 }
+  const fmt = (n) => (n ? String(Number(n)).replace('.', ',') : '')
+  const round2 = (n) => Math.round(n * 100) / 100
+
+  const [description, setDescription] = useState(editing?.description || '')
+  const [installmentValue, setInstallmentValue] = useState(editing && !editing.linkMinWage ? fmt(editing.installmentValue) : '')
+  const [totalInstallments, setTotalInstallments] = useState(editing ? String(editing.totalInstallments) : '')
+  const [firstDate, setFirstDate] = useState(editing?.firstDate || todayISO())
+  const [categoryId, setCategoryId] = useState(editing?.categoryId || '')
+  const [target, setTarget] = useState(editing?.target || (cards.length ? 'cartao' : 'conta'))
+  const [cardId, setCardId] = useState(editing?.cardId || cards[0]?.id || '')
+  const [accountId, setAccountId] = useState(editing?.accountId || nonCards[0]?.id || '')
+  const [linkMinWage, setLinkMinWage] = useState(!!editing?.linkMinWage)
+  const [minWageFraction, setMinWageFraction] = useState(editing?.minWageFraction ? fmt(editing.minWageFraction) : '0,5')
+  const [minWage, setMinWage] = useState(state.settings?.minWage ? fmt(state.settings.minWage) : '')
+
+  const computedValue = round2(parse(minWageFraction) * parse(minWage))
 
   const submit = (e) => {
     e.preventDefault()
     if (!description.trim()) return alert('Dê um nome ao parcelado.')
-    const v = parse(installmentValue)
     const tot = parseInt(totalInstallments, 10)
-    if (!(v > 0)) return alert('Informe o valor da parcela.')
     if (!(tot > 0)) return alert('Informe o total de parcelas.')
-    dispatch({
-      type: 'ADD_INSTALLMENT',
-      payload: {
-        description: description.trim(), installmentValue: v, totalInstallments: tot,
-        firstDate, categoryId, target,
-        cardId: target === 'cartao' ? cardId : undefined,
-        accountId: target === 'conta' ? accountId : undefined,
-      },
-    })
+
+    let value
+    if (linkMinWage) {
+      const mw = parse(minWage), frac = parse(minWageFraction)
+      if (!(mw > 0)) return alert('Informe o valor do salário mínimo.')
+      if (!(frac > 0)) return alert('Informe quantos salários mínimos.')
+      value = round2(frac * mw)
+      if (mw !== (state.settings?.minWage || 0)) dispatch({ type: 'SET_MINWAGE', value: mw })
+    } else {
+      value = parse(installmentValue)
+      if (!(value > 0)) return alert('Informe o valor da parcela.')
+    }
+
+    const payload = {
+      description: description.trim(), installmentValue: value, totalInstallments: tot,
+      firstDate, categoryId, target,
+      cardId: target === 'cartao' ? cardId : undefined,
+      accountId: target === 'conta' ? accountId : undefined,
+      linkMinWage, minWageFraction: linkMinWage ? parse(minWageFraction) : undefined,
+    }
+    if (editing) dispatch({ type: 'UPDATE_INSTALLMENT', payload: { ...payload, id: editing.id } })
+    else dispatch({ type: 'ADD_INSTALLMENT', payload })
     onClose()
   }
 
   return (
-    <Sheet title="Novo parcelado" onClose={onClose}>
+    <Sheet title={editing ? 'Editar parcelado' : 'Novo parcelado'} onClose={onClose}>
       <form onSubmit={submit}>
         <div className="field">
           <label>O que é</label>
           <input placeholder="Ex.: Financiamento carro, Pensão, Sofá 10x" value={description} onChange={(e) => setDescription(e.target.value)} autoFocus />
         </div>
-        <div className="field-row">
-          <div className="field">
-            <label>Valor da parcela</label>
-            <input inputMode="decimal" placeholder="0,00" value={installmentValue} onChange={(e) => setInstallmentValue(e.target.value)} />
+
+        <label className="spread" style={{ background: 'var(--card)', padding: '12px 14px', borderRadius: 12, border: '1px solid var(--border)', marginBottom: 14 }}>
+          <span style={{ color: 'var(--text)', fontWeight: 600 }}>Vincular ao salário mínimo
+            <div className="muted" style={{ fontWeight: 400, fontSize: 12, marginTop: 2 }}>Ex.: pensão = ½ do mínimo (atualiza no reajuste)</div>
+          </span>
+          <input type="checkbox" checked={linkMinWage} onChange={(e) => setLinkMinWage(e.target.checked)} style={{ width: 22, height: 22, flex: 'none' }} />
+        </label>
+
+        {linkMinWage ? (
+          <>
+            <div className="field-row">
+              <div className="field">
+                <label>Quantos salários mínimos</label>
+                <input inputMode="decimal" placeholder="0,5" value={minWageFraction} onChange={(e) => setMinWageFraction(e.target.value)} />
+              </div>
+              <div className="field">
+                <label>Salário mínimo atual</label>
+                <input inputMode="decimal" placeholder="0,00" value={minWage} onChange={(e) => setMinWage(e.target.value)} />
+              </div>
+            </div>
+            <div className="card" style={{ fontSize: 13, marginBottom: 14 }}>
+              <div className="spread"><span className="muted">Valor da parcela</span><b>{brl(computedValue)}</b></div>
+            </div>
+            <div className="field">
+              <label>Total de parcelas</label>
+              <input type="number" min="1" placeholder="Ex.: 24" value={totalInstallments} onChange={(e) => setTotalInstallments(e.target.value)} />
+            </div>
+          </>
+        ) : (
+          <div className="field-row">
+            <div className="field">
+              <label>Valor da parcela</label>
+              <input inputMode="decimal" placeholder="0,00" value={installmentValue} onChange={(e) => setInstallmentValue(e.target.value)} />
+            </div>
+            <div className="field">
+              <label>Total de parcelas</label>
+              <input type="number" min="1" placeholder="Ex.: 48" value={totalInstallments} onChange={(e) => setTotalInstallments(e.target.value)} />
+            </div>
           </div>
-          <div className="field">
-            <label>Total de parcelas</label>
-            <input type="number" min="1" placeholder="Ex.: 48" value={totalInstallments} onChange={(e) => setTotalInstallments(e.target.value)} />
-          </div>
-        </div>
+        )}
+
         <div className="field">
           <label>Data da 1ª parcela</label>
           <input type="date" value={firstDate} onChange={(e) => setFirstDate(e.target.value)} />
@@ -232,7 +288,7 @@ export function InstallmentForm({ onClose }) {
             </select>
           </div>
         )}
-        <button type="submit" className="btn primary full">Salvar parcelado</button>
+        <button type="submit" className="btn primary full">{editing ? 'Salvar alterações' : 'Salvar parcelado'}</button>
       </form>
     </Sheet>
   )
