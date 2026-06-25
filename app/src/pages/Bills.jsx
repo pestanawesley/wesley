@@ -146,7 +146,7 @@ function InstallmentCard({ inst, onDelete }) {
   )
 }
 
-function InstallmentForm({ onClose }) {
+export function InstallmentForm({ onClose }) {
   const { state, dispatch } = useStore()
   const cards = state.accounts.filter((a) => a.type === 'cartao')
   const nonCards = state.accounts.filter((a) => a.type !== 'cartao')
@@ -238,7 +238,7 @@ function InstallmentForm({ onClose }) {
   )
 }
 
-function BillForm({ onClose }) {
+export function BillForm({ onClose }) {
   const { state, dispatch } = useStore()
   const [type, setType] = useState('pagar')
   const [description, setDescription] = useState('')

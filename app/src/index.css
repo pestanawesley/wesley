@@ -471,6 +471,32 @@ label {
   color: #86efac;
 }
 
+/* menu rápido do botão + */
+.quick-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.quick-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 10px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text);
+}
+.quick-item:active {
+  transform: scale(0.98);
+}
+.quick-item .qi {
+  font-size: 28px;
+}
+
 /* category picker */
 .catgrid {
   display: grid;
