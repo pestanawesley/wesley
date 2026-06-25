@@ -1,7 +1,23 @@
 import { createContext, useContext, useEffect, useMemo, useReducer } from 'react'
 import * as db from './lib/db'
 import { seed } from './lib/seed'
-import { uid, currentMonthKey, monthKey, todayISO } from './lib/format'
+import { uid, currentMonthKey, monthKey, todayISO, isoForDay, addDaysISO, shiftMonth } from './lib/format'
+
+// Datas em que uma recorrência mensal "acontece", do início até o horizonte.
+function recurrenceOccurrences(rec, horizonISO) {
+  const out = []
+  let key = monthKey(rec.startDate)
+  const horizonKey = monthKey(horizonISO)
+  let guard = 0
+  while (key <= horizonKey && guard++ < 240) {
+    const iso = isoForDay(key, rec.dayOfMonth)
+    if (iso >= rec.startDate && iso <= horizonISO && (!rec.endDate || iso <= rec.endDate)) {
+      out.push(iso)
+    }
+    key = shiftMonth(key, 1)
+  }
+  return out
+}
 
 const StoreContext = createContext(null)
 
@@ -82,6 +98,71 @@ function reducer(state, action) {
       }
     }
 
+    // ---- Recorrências (salário, aluguel, assinaturas) ----
+    case 'ADD_RECURRENCE':
+      return { ...state, recurrences: [...state.recurrences, { ...action.payload, id: uid() }] }
+    case 'UPDATE_RECURRENCE':
+      return {
+        ...state,
+        recurrences: state.recurrences.map((r) =>
+          r.id === action.payload.id ? { ...r, ...action.payload } : r,
+        ),
+      }
+    case 'DELETE_RECURRENCE':
+      return { ...state, recurrences: state.recurrences.filter((r) => r.id !== action.id) }
+
+    // Gera lançamentos/contas das recorrências ativas (idempotente).
+    case 'MATERIALIZE': {
+      const horizon = addDaysISO(todayISO(), 45)
+      const today = todayISO()
+      // Chaves já existentes para não duplicar (recorrência + data).
+      const seen = new Set([
+        ...state.bills.filter((b) => b.recurrenceId).map((b) => `${b.recurrenceId}:${b.recurDate}`),
+        ...state.transactions.filter((t) => t.recurrenceId).map((t) => `${t.recurrenceId}:${t.recurDate}`),
+      ])
+      const newBills = []
+      const newTxs = []
+      for (const rec of state.recurrences.filter((r) => r.active !== false)) {
+        for (const iso of recurrenceOccurrences(rec, horizon)) {
+          const k = `${rec.id}:${iso}`
+          if (seen.has(k)) continue
+          seen.add(k)
+          if (rec.autoConfirm && iso <= today) {
+            newTxs.push({
+              id: uid(),
+              type: rec.type,
+              amount: rec.amount,
+              date: iso,
+              categoryId: rec.categoryId,
+              accountId: rec.accountId,
+              description: rec.description,
+              recurrenceId: rec.id,
+              recurDate: iso,
+            })
+          } else {
+            newBills.push({
+              id: uid(),
+              type: rec.type === 'ganho' ? 'receber' : 'pagar',
+              description: rec.description,
+              amount: rec.amount,
+              dueDate: iso,
+              categoryId: rec.categoryId,
+              accountId: rec.accountId,
+              status: 'pendente',
+              recurrenceId: rec.id,
+              recurDate: iso,
+            })
+          }
+        }
+      }
+      if (!newBills.length && !newTxs.length) return state
+      return {
+        ...state,
+        bills: [...newBills, ...state.bills],
+        transactions: [...newTxs, ...state.transactions],
+      }
+    }
+
     // ---- Metas ----
     case 'ADD_GOAL':
       return { ...state, goals: [...state.goals, { ...action.payload, id: uid(), saved: 0 }] }
@@ -109,6 +190,11 @@ function reducer(state, action) {
 
 export function StoreProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, undefined, init)
+
+  // Ao abrir o app, gera os lançamentos/contas das recorrências pendentes.
+  useEffect(() => {
+    dispatch({ type: 'MATERIALIZE' })
+  }, [])
 
   // Persiste no localStorage a cada mudança.
   useEffect(() => {
@@ -175,6 +261,13 @@ export function expensesByCategory(state, key = currentMonthKey()) {
 export function openBills(state) {
   return state.bills
     .filter((b) => b.status !== 'pago')
+    .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
+}
+
+// Todas as contas (pagas e pendentes) com vencimento num mês — para o calendário
+export function billsInMonth(state, key) {
+  return state.bills
+    .filter((b) => monthKey(b.dueDate) === key)
     .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
 }
 

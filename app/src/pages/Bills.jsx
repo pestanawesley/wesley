@@ -2,10 +2,14 @@ import { useState } from 'react'
 import { useStore, openBills, categoryById } from '../store'
 import { brl, formatDate, daysUntil, todayISO } from '../lib/format'
 import Sheet from '../components/Sheet'
+import Calendar from './Calendar'
+import Recurrences from '../components/Recurrences'
 
 export default function Bills() {
   const { state, dispatch } = useStore()
   const [adding, setAdding] = useState(false)
+  const [view, setView] = useState('lista') // lista | calendario
+  const [showRec, setShowRec] = useState(false)
 
   const bills = openBills(state)
   const toPay = bills.filter((b) => b.type === 'pagar').reduce((s, b) => s + b.amount, 0)
@@ -19,8 +23,26 @@ export default function Bills() {
 
   return (
     <div>
-      <div className="topbar"><h1>Contas futuras</h1></div>
+      <div className="spread" style={{ marginBottom: 16 }}>
+        <h1 style={{ fontSize: 20, fontWeight: 800 }}>Contas futuras</h1>
+        <button className="chip" onClick={() => setShowRec(true)}>🔁 Recorrentes</button>
+      </div>
 
+      <div className="toggle">
+        <button type="button" className={view === 'lista' ? 'on-ganho' : ''} onClick={() => setView('lista')}>📋 Lista</button>
+        <button type="button" className={view === 'calendario' ? 'on-ganho' : ''} onClick={() => setView('calendario')}>📅 Calendário</button>
+      </div>
+
+      {showRec && (
+        <Sheet title="Recorrentes" onClose={() => setShowRec(false)}>
+          <Recurrences />
+        </Sheet>
+      )}
+
+      {view === 'calendario' ? (
+        <Calendar />
+      ) : (
+      <>
       <div className="grid-2">
         <div className="stat"><div className="k">📥 A receber</div><div className="v pos">{brl(toReceive)}</div></div>
         <div className="stat"><div className="k">📤 A pagar</div><div className="v neg">{brl(toPay)}</div></div>
@@ -48,7 +70,7 @@ export default function Bills() {
                   {b.type === 'pagar' ? '📤' : '📥'}
                 </div>
                 <div className="body">
-                  <div className="t">{b.description}</div>
+                  <div className="t">{b.description} {b.recurrenceId && <span className="badge ok">🔁</span>}</div>
                   <div className="s">{formatDate(b.dueDate)} · {cat?.name || 'Sem categoria'} {badge}</div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
@@ -60,6 +82,8 @@ export default function Bills() {
           })
         )}
       </div>
+      </>
+      )}
 
       {adding && <BillForm onClose={() => setAdding(false)} />}
     </div>

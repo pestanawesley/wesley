@@ -64,3 +64,39 @@ export const daysUntil = (iso) => {
 
 export const uid = () =>
   `${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`
+
+// ---------- Helpers de calendário ----------
+
+export const daysInMonth = (year, month1to12) => new Date(year, month1to12, 0).getDate()
+
+// Garante um dia válido dentro do mês (ex.: dia 31 em fevereiro vira 28/29)
+export const isoForDay = (key, day) => {
+  const [y, m] = key.split('-').map(Number)
+  const d = Math.min(day, daysInMonth(y, m))
+  return `${key}-${String(d).padStart(2, '0')}`
+}
+
+export const addDaysISO = (iso, days) => {
+  const d = new Date(iso + 'T00:00:00')
+  d.setDate(d.getDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+export const WEEKDAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
+
+// Matriz do mês: array de semanas, cada uma com 7 células {iso, day, inMonth}
+export const monthMatrix = (key) => {
+  const [y, m] = key.split('-').map(Number)
+  const first = new Date(y, m - 1, 1)
+  const startDow = first.getDay() // 0 = domingo
+  const total = daysInMonth(y, m)
+  const cells = []
+  for (let i = 0; i < startDow; i++) cells.push(null)
+  for (let d = 1; d <= total; d++) {
+    cells.push({ iso: `${key}-${String(d).padStart(2, '0')}`, day: d, inMonth: true })
+  }
+  while (cells.length % 7 !== 0) cells.push(null)
+  const weeks = []
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7))
+  return weeks
+}

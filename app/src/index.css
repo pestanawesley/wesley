@@ -533,3 +533,61 @@ label {
   text-align: center;
   padding: 18px !important;
 }
+
+/* ---------- Calendário ---------- */
+.cal-head,
+.cal-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.cal-head {
+  margin-bottom: 6px;
+}
+.cal-dow {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.cal-row {
+  margin-bottom: 4px;
+}
+.cal-cell {
+  aspect-ratio: 1 / 1;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: var(--bg-soft);
+  border: 1px solid transparent;
+  font-size: 13px;
+  color: var(--text);
+  position: relative;
+}
+.cal-cell.empty-cell {
+  background: transparent;
+}
+.cal-cell .d {
+  font-weight: 600;
+}
+.cal-cell.today {
+  border-color: var(--accent);
+}
+.cal-cell.sel {
+  background: var(--card-2);
+  border-color: var(--accent-2);
+}
+.cal-cell .dots {
+  display: flex;
+  gap: 3px;
+  height: 6px;
+}
+.cal-cell .dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}

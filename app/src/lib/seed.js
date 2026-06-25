@@ -33,6 +33,7 @@ export function seed() {
     categories,
     transactions: [],
     bills: [],
+    recurrences: [],
     goals: [],
     meta: { createdAt: new Date().toISOString(), seeded: true },
   }
