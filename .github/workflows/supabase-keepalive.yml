@@ -1,0 +1,36 @@
+name: Supabase keep-alive
+
+# Faz um ping no projeto Supabase (WP INVESTIMENTOS) a cada 3 dias para gerar
+# atividade e evitar a pausa automática do plano gratuito por inatividade.
+# A consulta lê a tabela public.keep_alive, criada só para isso (somente leitura
+# para o papel anon, via RLS).
+
+on:
+  schedule:
+    - cron: "17 6 */3 * *" # a cada 3 dias, 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        env:
+          SUPABASE_URL: https://ctsavtizywjoqedlmktn.supabase.co
+          # Chave "publishable" do Supabase: própria para uso em clientes
+          # públicos; só dá acesso ao que as políticas de RLS permitirem.
+          SUPABASE_KEY: sb_publishable_4iTNh5veiGpXQxYfuSwRIA_HqPuJTGT
+        run: |
+          status=$(curl -sS -o /tmp/body.txt -w "%{http_code}" \
+            "$SUPABASE_URL/rest/v1/keep_alive?select=id&limit=1" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY")
+          echo "HTTP $status"
+          cat /tmp/body.txt
+          if [ "$status" != "200" ]; then
+            echo "Keep-alive falhou (HTTP $status)" >&2
+            exit 1
+          fi
